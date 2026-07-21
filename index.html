@@ -89,6 +89,26 @@
     padding:14px; max-height:420px; overflow:auto; display:none;
   }
   #preview.show{display:block;}
+  #flowchart-preview{
+    display:none; background:#fff; border:1px solid var(--border); border-radius:8px;
+    padding:14px; max-height:680px; overflow:auto; margin-top:10px; text-align:center;
+  }
+  #flowchart-preview.show{display:block;}
+  #validation-results{ display:none; margin-top:10px; }
+  #validation-results.show{ display:block; }
+  #validation-results .vgroup{ border-radius:8px; padding:10px 14px; margin-bottom:8px; font-size:12.5px; }
+  #validation-results .vgroup.errs{ background:#2a1620; border:1px solid #4a2530; }
+  #validation-results .vgroup.warns{ background:#2a2410; border:1px solid #4a3f1e; }
+  #validation-results .vgroup.ok{ background:#0f2a20; border:1px solid #1e4a38; }
+  #validation-results .vgroup h4{ margin:0 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+  #validation-results .vgroup.errs h4{ color:var(--danger); }
+  #validation-results .vgroup.warns h4{ color:var(--warn); }
+  #validation-results .vgroup.ok h4{ color:var(--accent2); }
+  #validation-results ul{ margin:0; padding-left:20px; }
+  #validation-results li{ margin:3px 0; }
+  .cond-group{ background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:6px 8px; margin-bottom:6px; }
+  .cond-group-label{ font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center; }
+  .cond-or-sep{ text-align:center; font-size:10px; color:var(--warn); font-weight:600; margin:2px 0; }
   .msg{font-size:12.5px; padding:8px 12px; border-radius:6px; margin-top:10px; display:none;}
   .msg.show{display:block;}
   .msg.err{background:#2a1620; color:var(--danger); border:1px solid #4a2530;}
@@ -138,6 +158,22 @@
       <div>
         <label>&nbsp;</label>
         <p class="hint" style="margin:6px 0 0;">If selected, the routine forces Step = 0 any time this input is OFF (e-stop / gate / interlock chain).</p>
+      </div>
+      <div>
+        <label>Fault Tag Name (optional)</label>
+        <input type="text" id="st-faulttag" placeholder="e.g. Station10_Fault (auto-named if left blank and a watchdog is used)">
+      </div>
+      <div>
+        <label>Fault Step (optional)</label>
+        <input type="number" id="st-faultstep" placeholder="step # to jump to on watchdog fault">
+      </div>
+      <div>
+        <label>Fault Reset Input (optional)</label>
+        <select id="st-faultreset"></select>
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <p class="hint" style="margin:6px 0 0;">Per-step watchdog timeouts (set below in Steps) latch this fault bit and can jump here. This input clears (unlatches) the fault bit when true.</p>
       </div>
     </div>
   </section>
@@ -194,9 +230,10 @@
     <p class="hint">Each step turns on the selected outputs, then advances when its conditions are met (or after a timeout). Step numbers auto-increment by 10 &mdash; edit to branch or reorder.</p>
     <table id="step-table">
       <thead><tr>
-        <th style="width:60px">Step #</th><th style="width:20%">Description</th>
-        <th style="width:16%">Outputs ON</th><th style="width:10%">Advance</th>
-        <th style="width:18%">Conditions / Timeout</th><th style="width:70px">Next Step</th><th style="width:60px"></th>
+        <th style="width:55px">Step #</th><th style="width:16%">Description</th>
+        <th style="width:14%">Outputs ON</th><th style="width:9%">Advance</th>
+        <th style="width:20%">Conditions / Timeout</th><th style="width:65px">Next Step</th>
+        <th style="width:85px">Watchdog (s)</th><th style="width:60px"></th>
       </tr></thead>
       <tbody></tbody>
     </table>
@@ -207,6 +244,12 @@
   <div class="toolbar">
     <button class="good primary" onclick="doGenerate()">&#11015; Generate L5X</button>
     <button onclick="togglePreview()">Preview XML / Tags</button>
+    <button class="primary" onclick="previewSOP()">&#128196; Preview SOP</button>
+    <button onclick="downloadSOP()">&#11015; Download SOP (DOCX)</button>
+    <button class="primary" onclick="toggleFlowchart()">&#128200; Preview Flowchart</button>
+    <button onclick="downloadFlowchart()">&#11015; Download Flowchart (SVG)</button>
+    <button onclick="downloadTagListCSV()">&#11015; Download Tag List (CSV)</button>
+    <button onclick="runValidation()">&#9989; Validate Station</button>
     <div class="spacer"></div>
     <button onclick="loadExample()">Load Example Station</button>
     <button onclick="exportConfig()">Export Config (JSON)</button>
@@ -214,7 +257,9 @@
     <input type="file" id="importFile" accept="application/json" onchange="importConfig(event)">
   </div>
   <div class="msg" id="msg"></div>
+  <div id="validation-results"></div>
   <pre id="preview"></pre>
+  <div id="flowchart-preview"></div>
 
   <div class="footer-note">
     <strong>Scope notes:</strong> generates a ladder logic (RLL) routine using a DINT step sequencer (EQU/OTE/MOV pattern), plus controller tags for every input and output you define, with descriptions carried over. Discrete/analog I/O default to plain Base tags with documentation-only physical addresses &mdash; map those to real I/O modules in Studio 5000 after import. EtherNet/IP devices flagged "Uses EDS" instead generate Alias tags pointing at that module's real members (<code>ModuleTagName:I/O.Member</code>), matching how Studio 5000 actually exposes EDS-based device data. <strong>Those aliases only resolve once you've separately installed the device's EDS file</strong> (Tools &rarr; EDS Hardware Installation Tool) <strong>and added it as a Module</strong> in the I/O tree under the matching Module Tag Name &mdash; that step happens in Studio 5000 itself, before or after importing this routine. Member names/types you enter here should be verified against the Module Definition dialog or the real EDS, since format varies by vendor. In Studio 5000: right-click the target Program &rarr; <em>Import Routine</em>, or right-click Controller Tags &rarr; <em>Import Tags</em>, and select the generated .L5X file. Review tag data types, radixes, and any "create tag" prompts before downloading to your controller.
@@ -225,7 +270,7 @@
 <script>
 // ---------- State ----------
 let state = {
-  station: { name:'', routine:'', program:'MainProgram', cycleMode:'continuous', resetInput:'' },
+  station: { name:'', routine:'', program:'MainProgram', cycleMode:'continuous', resetInput:'', faultTag:'', faultStep:null, faultResetInput:'' },
   equipment: [],
   inputs: [],
   outputs: [],
@@ -251,8 +296,37 @@ function clearMsg(){
   m.className = 'msg';
 }
 
+// ---------- Autosave (localStorage) ----------
+const AUTOSAVE_KEY = 'stationSequenceBuilder_autosave_v1';
+let autosaveTimer = null;
+function autosave(){
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(()=>{
+    try{ localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(state)); }
+    catch(e){ /* localStorage unavailable (private mode, etc.) - silently skip */ }
+  }, 300);
+}
+function tryRestoreAutosave(){
+  let raw;
+  try{ raw = localStorage.getItem(AUTOSAVE_KEY); }
+  catch(e){ return; }
+  if (!raw) return;
+  let data;
+  try{ data = JSON.parse(raw); }
+  catch(e){ return; }
+  const hasContent = data && ((data.inputs&&data.inputs.length) || (data.outputs&&data.outputs.length) || (data.steps&&data.steps.length) || (data.equipment&&data.equipment.length));
+  if (!hasContent) return;
+  const label = (data.station && data.station.name) ? `"${data.station.name}"` : '(unnamed station)';
+  if (!confirm(`Restore your last unsaved session for ${label}? Choose Cancel to start blank.`)) {
+    try{ localStorage.removeItem(AUTOSAVE_KEY); }catch(e){}
+    return;
+  }
+  loadConfigData(data);
+  showMsg('Restored your last autosaved session.', true);
+}
+
 // ---------- Station info bindings ----------
-['st-name','st-routine','st-program','st-cyclemode','st-reset'].forEach(id=>{
+['st-name','st-routine','st-program','st-cyclemode','st-reset','st-faulttag','st-faultstep','st-faultreset'].forEach(id=>{
   document.getElementById(id).addEventListener('change', syncStation);
   document.getElementById(id).addEventListener('input', syncStation);
 });
@@ -262,14 +336,28 @@ function syncStation(){
   state.station.program = document.getElementById('st-program').value.trim() || 'MainProgram';
   state.station.cycleMode = document.getElementById('st-cyclemode').value;
   state.station.resetInput = document.getElementById('st-reset').value;
+  state.station.faultTag = document.getElementById('st-faulttag').value.trim();
+  const fs = document.getElementById('st-faultstep').value;
+  state.station.faultStep = fs === '' ? null : Number(fs);
+  state.station.faultResetInput = document.getElementById('st-faultreset').value;
+  autosave();
 }
 function refreshResetOptions(){
+  const options = ['<option value="">(none)</option>'].concat(
+    state.inputs.map(i => `<option value="${esc(i.tag)}">${esc(i.tag)}</option>`)
+  ).join('');
+
   const sel = document.getElementById('st-reset');
   const cur = state.station.resetInput;
-  sel.innerHTML = '<option value="">(none)</option>' +
-    state.inputs.map(i => `<option value="${esc(i.tag)}">${esc(i.tag)}</option>`).join('');
+  sel.innerHTML = options;
   if ([...sel.options].some(o=>o.value===cur)) sel.value = cur;
   else state.station.resetInput = '';
+
+  const selF = document.getElementById('st-faultreset');
+  const curF = state.station.faultResetInput;
+  selF.innerHTML = options;
+  if ([...selF.options].some(o=>o.value===curF)) selF.value = curF;
+  else state.station.faultResetInput = '';
 }
 
 // ---------- Equipment ----------
@@ -344,12 +432,14 @@ function renderEquipment(){
   document.getElementById('eq-count').textContent = state.equipment.length;
   document.getElementById('eq-empty').style.display = state.equipment.length ? 'none' : 'block';
   renderInputs(); renderOutputs();
+  autosave();
 }
 function eq_upd(id, field, val){
   const eq = state.equipment.find(e=>e.id===id);
   if (eq){
     eq[field] = val;
     if (field==='name' || field==='usesEds' || field==='moduleTagName'){ renderEquipment(); return; }
+    autosave();
   }
 }
 function eqm_add(eqId){
@@ -460,6 +550,7 @@ function renderInputs(){
   document.getElementById('in-count').textContent = state.inputs.length;
   document.getElementById('in-empty').style.display = state.inputs.length ? 'none':'block';
   refreshResetOptions();
+  autosave();
 }
 function renderOutputs(){
   const tbody = document.querySelector('#out-table tbody');
@@ -467,6 +558,7 @@ function renderOutputs(){
   state.outputs.forEach(item=> tbody.appendChild(ioRow(item,'O','out_upd','removeOutput')));
   document.getElementById('out-count').textContent = state.outputs.length;
   document.getElementById('out-empty').style.display = state.outputs.length ? 'none':'block';
+  autosave();
 }
 function in_upd(id, field, val){
   const it = state.inputs.find(x=>x.id===id); if(!it) return;
@@ -479,6 +571,7 @@ function in_upd(id, field, val){
   }
   if (field==='tag') { refreshResetOptions(); renderSteps(); }
   if (['equipment','source','member'].includes(field)) renderInputs();
+  autosave();
 }
 function out_upd(id, field, val){
   const it = state.outputs.find(x=>x.id===id); if(!it) return;
@@ -491,6 +584,7 @@ function out_upd(id, field, val){
   }
   if (field==='tag') renderSteps();
   if (['equipment','source','member'].includes(field)) renderOutputs();
+  autosave();
 }
 
 // ---------- Steps ----------
@@ -501,8 +595,10 @@ function nextStepNumber(){
 function addStep(data){
   const st = data || {
     id:newId(), num:nextStepNumber(), desc:'', outputsOn:[], mode:'conditions',
-    conditions:[], timeoutSec:5, next:null
+    condGroups:[[]], timeoutSec:5, next:null, watchdogSec:null
   };
+  if (!st.condGroups){ st.condGroups = st.conditions ? [st.conditions] : [[]]; }
+  if (st.watchdogSec === undefined) st.watchdogSec = null;
   state.steps.push(st);
   renderSteps();
 }
@@ -540,14 +636,30 @@ function step_toggleOutput(id, tag, checked){
   st.outputsOn = checked ? [...new Set([...st.outputsOn, tag])] : st.outputsOn.filter(t=>t!==tag);
   renderSteps(true);
 }
-function step_toggleCondition(id, tag, checked){
+function step_toggleCondition(msId, tag, checked){
+  // msId format: cond_<stepId>_<groupIdx> - stepIds never contain underscores (newId() = 'id'+N)
+  const parts = msId.split('_');
+  const groupIdx = Number(parts.pop());
+  const stepId = parts.slice(1).join('_');
+  const st = state.steps.find(s=>s.id===stepId); if(!st) return;
+  const g = st.condGroups[groupIdx]; if(!g) return;
+  st.condGroups[groupIdx] = checked ? [...new Set([...g, tag])] : g.filter(t=>t!==tag);
+  renderSteps(true);
+}
+function step_addCondGroup(id){
   const st = state.steps.find(s=>s.id===id); if(!st) return;
-  st.conditions = checked ? [...new Set([...st.conditions, tag])] : st.conditions.filter(t=>t!==tag);
+  st.condGroups.push([]);
+  renderSteps(true);
+}
+function step_removeCondGroup(id, groupIdx){
+  const st = state.steps.find(s=>s.id===id); if(!st) return;
+  if (st.condGroups.length <= 1) return;
+  st.condGroups.splice(groupIdx, 1);
   renderSteps(true);
 }
 function step_upd(id, field, val){
   const st = state.steps.find(s=>s.id===id); if(!st) return;
-  if (field==='num' || field==='timeoutSec' || field==='next'){
+  if (field==='num' || field==='timeoutSec' || field==='next' || field==='watchdogSec'){
     st[field] = val==='' ? null : Number(val);
   } else {
     st[field] = val;
@@ -586,9 +698,39 @@ function renderSteps(keepOpen){
 
     const tdCond = document.createElement('td');
     if (st.mode === 'conditions'){
-      const ms = document.createElement('div');
-      ms.innerHTML = multiSelectHtml('cond_'+st.id, inTags, st.conditions, 'step_toggleCondition');
-      tdCond.appendChild(ms);
+      if (!st.condGroups || !st.condGroups.length) st.condGroups = [[]];
+      st.condGroups.forEach((group, gIdx)=>{
+        if (gIdx > 0){
+          const sep = document.createElement('div');
+          sep.className = 'cond-or-sep';
+          sep.textContent = 'OR';
+          tdCond.appendChild(sep);
+        }
+        const wrap = document.createElement('div');
+        wrap.className = 'cond-group';
+        const labelRow = document.createElement('div');
+        labelRow.className = 'cond-group-label';
+        const groupName = document.createElement('span');
+        groupName.textContent = st.condGroups.length > 1 ? `Group ${gIdx+1} (AND)` : 'AND';
+        labelRow.appendChild(groupName);
+        if (st.condGroups.length > 1){
+          const rmBtn = document.createElement('button');
+          rmBtn.className = 'small icon-del';
+          rmBtn.textContent = '×';
+          rmBtn.onclick = () => step_removeCondGroup(st.id, gIdx);
+          labelRow.appendChild(rmBtn);
+        }
+        wrap.appendChild(labelRow);
+        const ms = document.createElement('div');
+        ms.innerHTML = multiSelectHtml('cond_'+st.id+'_'+gIdx, inTags, group, 'step_toggleCondition');
+        wrap.appendChild(ms);
+        tdCond.appendChild(wrap);
+      });
+      const addGroupBtn = document.createElement('button');
+      addGroupBtn.className = 'small';
+      addGroupBtn.textContent = '+ OR Group';
+      addGroupBtn.onclick = () => step_addCondGroup(st.id);
+      tdCond.appendChild(addGroupBtn);
     } else if (st.mode === 'timer') {
       tdCond.innerHTML = `<input type="number" min="0" step="0.1" value="${st.timeoutSec ?? 5}" style="width:90px" oninput="step_upd('${st.id}','timeoutSec',this.value)"> sec`;
     } else {
@@ -598,16 +740,20 @@ function renderSteps(keepOpen){
     const tdNext = document.createElement('td');
     tdNext.innerHTML = `<input class="step-num" type="number" placeholder="${defaultNext}" value="${st.next ?? ''}" oninput="step_upd('${st.id}','next',this.value)">`;
 
+    const tdWatchdog = document.createElement('td');
+    tdWatchdog.innerHTML = `<input type="number" min="0" step="0.5" placeholder="off" value="${st.watchdogSec ?? ''}" style="width:70px" oninput="step_upd('${st.id}','watchdogSec',this.value)">`;
+
     const tdDel = document.createElement('td');
     tdDel.className = 'row-actions';
     tdDel.innerHTML = `<button class="small icon-del" onclick="removeStep('${st.id}')">Delete</button>`;
 
-    tr.append(tdNum, tdDesc, tdOut, tdMode, tdCond, tdNext, tdDel);
+    tr.append(tdNum, tdDesc, tdOut, tdMode, tdCond, tdNext, tdWatchdog, tdDel);
     tbody.appendChild(tr);
   });
 
   document.getElementById('step-count').textContent = state.steps.length;
   document.getElementById('step-empty').style.display = state.steps.length ? 'none' : 'block';
+  autosave();
 }
 
 // ---------- Example ----------
@@ -648,13 +794,18 @@ function loadExample(){
   syncStation();
   refreshResetOptions();
   document.getElementById('st-reset').value = 'EStop_OK';
+  document.getElementById('st-faulttag').value = 'Station10_Fault';
+  document.getElementById('st-faultstep').value = '';
+  syncStation();
+  refreshResetOptions();
+  document.getElementById('st-faultreset').value = 'EStop_OK';
   syncStation();
 
-  addStep({id:newId(), num:0, desc:'Idle - wait for start & part present', outputsOn:[], mode:'conditions', conditions:['Start_PB','PartPresent_PE101'], timeoutSec:5, next:10});
-  addStep({id:newId(), num:10, desc:'Clamp part', outputsOn:['Clamp_CMD'], mode:'conditions', conditions:['Clamp_Confirmed'], timeoutSec:5, next:20});
-  addStep({id:newId(), num:20, desc:'Run spindle until at speed', outputsOn:['Clamp_CMD','Spindle_Run_CMD'], mode:'conditions', conditions:['Spindle_AtSpeed'], timeoutSec:5, next:30});
-  addStep({id:newId(), num:30, desc:'Process dwell', outputsOn:['Clamp_CMD','Spindle_Run_CMD'], mode:'timer', conditions:[], timeoutSec:8, next:40});
-  addStep({id:newId(), num:40, desc:'Cycle complete - signal lamp', outputsOn:['CycleComplete_Lamp'], mode:'timer', conditions:[], timeoutSec:2, next:0});
+  addStep({id:newId(), num:0, desc:'Idle - wait for start & part present', outputsOn:[], mode:'conditions', condGroups:[['Start_PB','PartPresent_PE101']], timeoutSec:5, next:10, watchdogSec:null});
+  addStep({id:newId(), num:10, desc:'Clamp part', outputsOn:['Clamp_CMD'], mode:'conditions', condGroups:[['Clamp_Confirmed']], timeoutSec:5, next:20, watchdogSec:15});
+  addStep({id:newId(), num:20, desc:'Run spindle until at speed', outputsOn:['Clamp_CMD','Spindle_Run_CMD'], mode:'conditions', condGroups:[['Spindle_AtSpeed'],['Start_PB']], timeoutSec:5, next:30, watchdogSec:20});
+  addStep({id:newId(), num:30, desc:'Process dwell', outputsOn:['Clamp_CMD','Spindle_Run_CMD'], mode:'timer', condGroups:[[]], timeoutSec:8, next:40, watchdogSec:null});
+  addStep({id:newId(), num:40, desc:'Cycle complete - signal lamp', outputsOn:['CycleComplete_Lamp'], mode:'timer', condGroups:[[]], timeoutSec:2, next:0, watchdogSec:null});
 
   clearMsg();
 }
@@ -668,6 +819,44 @@ function exportConfig(){
   a.download = (state.station.name || 'station_config') + '.json';
   a.click();
 }
+function loadConfigData(data){
+  uid = 1;
+  state = data;
+  // reassign fresh ids if missing, and backfill fields from older config versions
+  const ensureIds = arr => (arr||[]).forEach(x=>{ if(!x.id) x.id = newId(); });
+  ensureIds(state.equipment); ensureIds(state.inputs); ensureIds(state.outputs); ensureIds(state.steps);
+  (state.equipment||[]).forEach(eq=>{
+    if (eq.manufacturer===undefined) eq.manufacturer='';
+    if (eq.model===undefined) eq.model='';
+    if (eq.usesEds===undefined) eq.usesEds=false;
+    if (eq.moduleTagName===undefined) eq.moduleTagName='';
+    if (!eq.edsMembers) eq.edsMembers=[];
+    eq.edsMembers.forEach(m=>{ if(!m.id) m.id=newId(); });
+  });
+  [...(state.inputs||[]), ...(state.outputs||[])].forEach(io=>{
+    if (io.source===undefined) io.source='generic';
+    if (io.member===undefined) io.member='';
+  });
+  (state.steps||[]).forEach(st=>{
+    if (!st.condGroups){ st.condGroups = st.conditions ? [st.conditions] : [[]]; }
+    if (st.watchdogSec === undefined) st.watchdogSec = null;
+  });
+  if (!state.station) state.station = {};
+  if (state.station.faultTag===undefined) state.station.faultTag='';
+  if (state.station.faultStep===undefined) state.station.faultStep=null;
+  if (state.station.faultResetInput===undefined) state.station.faultResetInput='';
+  document.getElementById('st-name').value = state.station.name||'';
+  document.getElementById('st-routine').value = state.station.routine||'';
+  document.getElementById('st-program').value = state.station.program||'MainProgram';
+  document.getElementById('st-cyclemode').value = state.station.cycleMode||'continuous';
+  document.getElementById('st-faulttag').value = state.station.faultTag||'';
+  document.getElementById('st-faultstep').value = state.station.faultStep ?? '';
+  renderEquipment(); renderInputs(); renderOutputs();
+  document.getElementById('st-reset').value = state.station.resetInput||'';
+  document.getElementById('st-faultreset').value = state.station.faultResetInput||'';
+  renderSteps();
+}
+
 function importConfig(evt){
   const file = evt.target.files[0];
   if (!file) return;
@@ -675,30 +864,7 @@ function importConfig(evt){
   reader.onload = () => {
     try{
       const data = JSON.parse(reader.result);
-      uid = 1;
-      state = data;
-      // reassign fresh ids if missing, and backfill fields from older config versions
-      const ensureIds = arr => (arr||[]).forEach(x=>{ if(!x.id) x.id = newId(); });
-      ensureIds(state.equipment); ensureIds(state.inputs); ensureIds(state.outputs); ensureIds(state.steps);
-      (state.equipment||[]).forEach(eq=>{
-        if (eq.manufacturer===undefined) eq.manufacturer='';
-        if (eq.model===undefined) eq.model='';
-        if (eq.usesEds===undefined) eq.usesEds=false;
-        if (eq.moduleTagName===undefined) eq.moduleTagName='';
-        if (!eq.edsMembers) eq.edsMembers=[];
-        eq.edsMembers.forEach(m=>{ if(!m.id) m.id=newId(); });
-      });
-      [...(state.inputs||[]), ...(state.outputs||[])].forEach(io=>{
-        if (io.source===undefined) io.source='generic';
-        if (io.member===undefined) io.member='';
-      });
-      document.getElementById('st-name').value = state.station.name||'';
-      document.getElementById('st-routine').value = state.station.routine||'';
-      document.getElementById('st-program').value = state.station.program||'MainProgram';
-      document.getElementById('st-cyclemode').value = state.station.cycleMode||'continuous';
-      renderEquipment(); renderInputs(); renderOutputs();
-      document.getElementById('st-reset').value = state.station.resetInput||'';
-      renderSteps();
+      loadConfigData(data);
       showMsg('Configuration imported.', true);
     }catch(e){
       showMsg('Could not parse that file as a valid config JSON.', false);
@@ -758,6 +924,24 @@ function rung(text, comment){
   return `      <Rung Number="__N__" Type="N">${c}\n        <Text><![CDATA[${text}]]></Text>\n      </Rung>`;
 }
 
+// Turns condGroups ([[a,b],[c]] = (a AND b) OR c) into ladder neutral-text branch syntax.
+function condGroupsRungText(condGroups){
+  const groups = (condGroups||[]).filter(g=>g && g.length);
+  if (!groups.length) return '';
+  if (groups.length === 1) return groups[0].map(t=>`XIC(${t})`).join('');
+  return '[' + groups.map(g=> g.map(t=>`XIC(${t})`).join('')).join(',') + ']';
+}
+// Human-readable form for SOP/flowchart: "(a AND b) OR c"
+function condGroupsText(condGroups){
+  const groups = (condGroups||[]).filter(g=>g && g.length);
+  if (!groups.length) return null;
+  const parts = groups.map(g => g.length>1 ? '(' + g.join(' AND ') + ')' : g[0]);
+  return parts.join(' OR ');
+}
+function stationFaultTag(){
+  return state.station.faultTag || ((state.station.name ? state.station.name.replace(/[^A-Za-z0-9_]/g,'_') : 'Station') + '_Fault');
+}
+
 function generateL5X(){
   syncStation();
   const errors = [];
@@ -789,11 +973,13 @@ function generateL5X(){
   const dupes = allTags.filter((t,i)=>allTags.indexOf(t)!==i);
   if (dupes.length) errors.push('Duplicate tag names: ' + [...new Set(dupes)].join(', '));
 
-  state.steps.forEach(st=>{
-    if (st.mode === 'conditions' && st.outputsOn.length===0 && st.conditions.length===0){
-      // allowed, just a wait step with no outputs - not an error
-    }
-  });
+  const hasWatchdog = state.steps.some(st => st.watchdogSec);
+  if (hasWatchdog && state.station.faultTag && !validTag(state.station.faultTag)){
+    errors.push('Fault Tag Name must be a valid Logix tag name.');
+  }
+  if (state.station.faultStep !== null && state.station.faultStep !== undefined && !state.steps.some(s=>s.num===state.station.faultStep)){
+    errors.push(`Fault Step ${state.station.faultStep} does not match any defined step number.`);
+  }
 
   if (errors.length){
     showMsg(errors.join(' '), false);
@@ -821,7 +1007,14 @@ function generateL5X(){
     if (st.mode === 'timer'){
       tagXmls.push(buildTagXml({tag: 'Step' + st.num + '_TMR', timeoutSec: st.timeoutSec}, 'timer'));
     }
+    if (st.watchdogSec){
+      tagXmls.push(buildTagXml({tag: 'Step' + st.num + '_WD', timeoutSec: st.watchdogSec}, 'timer'));
+    }
   });
+  const faultTagName = stationFaultTag();
+  if (hasWatchdog){
+    tagXmls.push(buildTagXml({tag:faultTagName, dtype:'BOOL', desc:'Latched fault - set when a step watchdog times out', equipment:'', addr:''}, 'base'));
+  }
 
   // ---- EDS equipment notes (documentation only - the actual Module must be added in Studio 5000 after installing the EDS) ----
   const edsEquip = state.equipment.filter(e=>e.usesEds && e.moduleTagName);
@@ -837,6 +1030,9 @@ function generateL5X(){
 
   if (state.station.resetInput){
     rungs.push(rung(`XIO(${state.station.resetInput})MOV(0,${stepTagName});`, 'Safety/Reset - force Step 0 whenever interlock input is not satisfied'));
+  }
+  if (hasWatchdog && state.station.faultResetInput){
+    rungs.push(rung(`XIC(${state.station.faultResetInput})OTU(${faultTagName});`, 'Fault Reset - unlatch the watchdog fault bit whenever this input is healthy'));
   }
 
   sorted.forEach((st, idx)=>{
@@ -855,7 +1051,7 @@ function generateL5X(){
     const nextStep = (st.next===null || st.next===undefined || st.next==='') ? defaultNext : st.next;
 
     if (st.mode === 'conditions'){
-      const condText = st.conditions.map(c=>`XIC(${c})`).join('');
+      const condText = condGroupsRungText(st.condGroups);
       rungs.push(rung(`${stepCond}${condText}MOV(${nextStep},${stepTagName});`, `Advance from Step ${st.num} when conditions met`));
     } else if (st.mode === 'timer'){
       const tmr = 'Step' + st.num + '_TMR';
@@ -863,6 +1059,15 @@ function generateL5X(){
       rungs.push(rung(`${stepCond}XIC(${tmr}.DN)MOV(${nextStep},${stepTagName});`, `Advance from Step ${st.num} on timeout`));
     } else {
       rungs.push(rung(';', `Step ${st.num} advances manually or from an external routine - no auto-transition generated`));
+    }
+
+    if (st.watchdogSec){
+      const wd = 'Step' + st.num + '_WD';
+      rungs.push(rung(`${stepCond}TON(${wd});`, `Step ${st.num} watchdog (${st.watchdogSec}s max time in step)`));
+      const faultAction = (state.station.faultStep !== null && state.station.faultStep !== undefined)
+        ? `XIC(${wd}.DN)OTL(${faultTagName})MOV(${state.station.faultStep},${stepTagName});`
+        : `XIC(${wd}.DN)OTL(${faultTagName});`;
+      rungs.push(rung(`${stepCond}${faultAction}`, `Step ${st.num} watchdog timeout - latch fault${state.station.faultStep!==null && state.station.faultStep!==undefined ? ' and jump to Step '+state.station.faultStep : ''}`));
     }
   });
 
@@ -921,12 +1126,801 @@ function doGenerate(){
   showMsg(`Generated ${result.rungCount} rungs and ${result.tagCount} tags. File downloaded - import it into Studio 5000 via Program → Import Routine.`, true);
 }
 
+// ---------- SOP generation ----------
+function lookupIODesc(tag){
+  const hit = [...state.inputs, ...state.outputs].find(i=>i.tag===tag);
+  return hit ? hit.desc : '';
+}
+function sopEsc(s){ return esc(s); }
+
+function generateSOP(){
+  syncStation();
+  if (!state.station.name){ showMsg('Add a Station / Machine Name before generating an SOP.', false); return null; }
+  if (!state.steps.length){ showMsg('Add at least one step before generating an SOP.', false); return null; }
+
+  const sorted = [...state.steps].sort((a,b)=>a.num-b.num);
+  const today = new Date().toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
+
+  const equipRows = state.equipment.map(eq => `
+    <tr>
+      <td>${sopEsc(eq.name)}</td><td>${sopEsc(eq.type)}</td>
+      <td>${sopEsc(eq.manufacturer)}</td><td>${sopEsc(eq.model)}</td>
+      <td>${sopEsc(eq.notes)}</td>
+    </tr>`).join('') || `<tr><td colspan="5" class="sop-empty">No equipment recorded.</td></tr>`;
+
+  const ioRowsHtml = (list) => list.map(i => `
+    <tr><td>${sopEsc(i.tag)}</td><td>${sopEsc(i.desc)}</td><td>${sopEsc(i.equipment)}</td></tr>`).join('')
+    || `<tr><td colspan="3" class="sop-empty">None recorded.</td></tr>`;
+
+  let safetyItems = [];
+  if (state.station.resetInput){
+    const rDesc = lookupIODesc(state.station.resetInput);
+    safetyItems.push(`Confirm the safety/interlock input <strong>${sopEsc(state.station.resetInput)}</strong>${rDesc ? ' ('+sopEsc(rDesc)+')' : ''} is satisfied before starting the sequence. The routine automatically forces the station back to Step 0 if this input drops out at any point during the cycle.`);
+  }
+  if (state.steps.some(s=>s.watchdogSec)){
+    safetyItems.push(`This station uses step watchdog timers. If <strong>${sopEsc(stationFaultTag())}</strong> is latched, the sequence has faulted on a stuck step${state.station.faultResetInput ? ' - clear it via <strong>'+sopEsc(state.station.faultResetInput)+'</strong> only after the root cause is corrected' : ''}.`);
+  }
+  safetyItems.push('Follow site lockout/tagout (LOTO) procedures before performing any manual intervention on this station.');
+  safetyItems.push('Wear all PPE required for this work area per site policy.');
+  safetyItems.push('Do not bypass interlocks, guards, or safety devices referenced in this procedure.');
+  const safetyHtml = safetyItems.map(s=>`<li>${s}</li>`).join('');
+
+  const stepsHtml = sorted.map((st, idx) => {
+    const defaultNext = idx < sorted.length-1 ? sorted[idx+1].num : (state.station.cycleMode==='continuous' ? 0 : st.num);
+    const nextStep = (st.next===null || st.next===undefined || st.next==='') ? defaultNext : st.next;
+
+    const outputsHtml = st.outputsOn.length
+      ? `<ul>${st.outputsOn.map(tag=>`<li><strong>${sopEsc(tag)}</strong>${lookupIODesc(tag) ? ' — '+sopEsc(lookupIODesc(tag)) : ''}</li>`).join('')}</ul>`
+      : `<p class="sop-muted">No outputs are activated during this step.</p>`;
+
+    let advanceHtml;
+    if (st.mode === 'conditions'){
+      const groups = (st.condGroups||[]).filter(g=>g && g.length);
+      advanceHtml = groups.length
+        ? `<p>Proceeds to the next step when ${groups.length>1 ? '<strong>any</strong> of the following groups are true (each group requires <strong>all</strong> its conditions)' : '<strong>all</strong> of the following are true'}:</p>` +
+          groups.map((g,gi)=> `${groups.length>1 ? `<p class="sop-muted" style="margin:6px 0 2px;">Group ${gi+1}${gi>0?' (OR)':''}:</p>`:''}<ul>${g.map(tag=>`<li><strong>${sopEsc(tag)}</strong>${lookupIODesc(tag) ? ' — '+sopEsc(lookupIODesc(tag)) : ''}</li>`).join('')}</ul>`).join('')
+        : `<p class="sop-muted">Proceeds to the next step immediately (no conditions defined).</p>`;
+    } else if (st.mode === 'timer'){
+      advanceHtml = `<p>Proceeds automatically after <strong>${st.timeoutSec ?? 0} seconds</strong>.</p>`;
+    } else {
+      advanceHtml = `<p class="sop-muted">Advances manually or is triggered by an external routine — no automatic condition.</p>`;
+    }
+    if (st.watchdogSec){
+      advanceHtml += `<p class="sop-muted">Watchdog: if this step has not advanced within <strong>${st.watchdogSec} seconds</strong>, the fault bit <strong>${sopEsc(stationFaultTag())}</strong> latches${(state.station.faultStep!==null && state.station.faultStep!==undefined) ? ' and the sequence jumps to Step '+state.station.faultStep : ''}.</p>`;
+    }
+
+    const nextHtml = (nextStep === st.num)
+      ? `Holds at Step ${st.num} (end of cycle - requires reset to restart).`
+      : (nextStep === 0 && idx === sorted.length-1)
+        ? `Returns to Step 0 and the cycle repeats.`
+        : `Continues to Step ${nextStep}.`;
+
+    return `
+      <div class="sop-step">
+        <h3>Step ${st.num}${st.desc ? ' — ' + sopEsc(st.desc) : ''}</h3>
+        <div class="sop-step-body">
+          <div><span class="sop-label">Action</span>${outputsHtml}</div>
+          <div><span class="sop-label">Advance Condition</span>${advanceHtml}</div>
+          <div><span class="sop-label">Next</span><p>${nextHtml}</p></div>
+        </div>
+      </div>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SOP - ${sopEsc(state.station.name)}</title>
+<style>
+  :root{ color-scheme: light; }
+  *{box-sizing:border-box;}
+  body{ font-family:Georgia,'Times New Roman',serif; color:#1a1a1a; background:#fff; max-width:850px; margin:0 auto; padding:40px 48px; line-height:1.5; }
+  h1{ font-size:22px; margin:0 0 4px; font-family:Arial,Helvetica,sans-serif; }
+  h2{ font-size:15px; margin:28px 0 10px; font-family:Arial,Helvetica,sans-serif; border-bottom:2px solid #1a1a1a; padding-bottom:4px; }
+  h3{ font-size:13.5px; margin:0 0 8px; font-family:Arial,Helvetica,sans-serif; background:#eef1f6; padding:6px 10px; border-left:4px solid #2a5cc9; }
+  p{ margin:6px 0; font-size:12.5px; }
+  ul{ margin:4px 0 8px; padding-left:22px; font-size:12.5px; }
+  li{ margin:2px 0; }
+  table{ width:100%; border-collapse:collapse; font-size:12px; margin:8px 0 4px; }
+  th,td{ border:1px solid #ccc; padding:5px 8px; text-align:left; vertical-align:top; }
+  th{ background:#eef1f6; font-family:Arial,Helvetica,sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
+  .sop-empty, .sop-muted{ color:#777; font-style:italic; }
+  .doc-control{ width:100%; border-collapse:collapse; font-size:11.5px; margin-top:14px; }
+  .doc-control td{ border:1px solid #ccc; padding:6px 8px; }
+  .doc-control td.k{ background:#f4f4f4; font-weight:bold; width:22%; font-family:Arial,Helvetica,sans-serif; }
+  .sop-step{ margin-bottom:16px; page-break-inside:avoid; border:1px solid #ddd; border-radius:4px; overflow:hidden; }
+  .sop-step-body{ display:grid; grid-template-columns:1.2fr 1.6fr 1fr; gap:0; }
+  .sop-step-body > div{ padding:8px 12px; border-left:1px solid #eee; }
+  .sop-step-body > div:first-child{ border-left:none; }
+  .sop-label{ display:block; font-family:Arial,Helvetica,sans-serif; font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:#666; margin-bottom:4px; }
+  .toolbar-print{ margin-bottom:20px; }
+  .toolbar-print button{ font-family:Arial,Helvetica,sans-serif; font-size:12.5px; padding:8px 16px; border-radius:6px; border:1px solid #2a5cc9; background:#2a5cc9; color:#fff; cursor:pointer; }
+  @media print{
+    .toolbar-print{ display:none; }
+    body{ padding:0; max-width:100%; }
+    .sop-step{ break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+  <div class="toolbar-print"><button onclick="window.print()">Print / Save as PDF</button></div>
+
+  <h1>Standard Operating Procedure</h1>
+  <p style="font-family:Arial,Helvetica,sans-serif; color:#555;">${sopEsc(state.station.name)}</p>
+
+  <table class="doc-control">
+    <tr><td class="k">Station / Machine</td><td>${sopEsc(state.station.name)}</td><td class="k">Date Generated</td><td>${today}</td></tr>
+    <tr><td class="k">Revision</td><td>&nbsp;</td><td class="k">Prepared By</td><td>&nbsp;</td></tr>
+    <tr><td class="k">Approved By</td><td>&nbsp;</td><td class="k">Approval Date</td><td>&nbsp;</td></tr>
+  </table>
+
+  <h2>1. Purpose &amp; Scope</h2>
+  <p>This procedure describes the standard operating sequence for <strong>${sopEsc(state.station.name)}</strong>. It is intended for trained operators and technicians responsible for running this station and covers the automatic operating cycle from start through completion.</p>
+
+  <h2>2. Safety Precautions</h2>
+  <ul>${safetyHtml}</ul>
+  <p class="sop-muted">This section is generated from the interlock defined in the builder plus standard boilerplate &mdash; add any site- or process-specific hazards (pinch points, hot surfaces, pressurized lines, chemical exposure, etc.) before publishing this document.</p>
+
+  <h2>3. Equipment</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Type</th><th>Manufacturer</th><th>Model</th><th>Notes</th></tr></thead>
+    <tbody>${equipRows}</tbody>
+  </table>
+
+  <h2>4. Inputs Reference</h2>
+  <table>
+    <thead><tr><th>Tag</th><th>Description</th><th>Equipment</th></tr></thead>
+    <tbody>${ioRowsHtml(state.inputs)}</tbody>
+  </table>
+
+  <h2>5. Outputs Reference</h2>
+  <table>
+    <thead><tr><th>Tag</th><th>Description</th><th>Equipment</th></tr></thead>
+    <tbody>${ioRowsHtml(state.outputs)}</tbody>
+  </table>
+
+  <h2>6. Operating Sequence</h2>
+  ${stepsHtml}
+
+  <h2>7. Revision History</h2>
+  <table>
+    <thead><tr><th style="width:12%">Rev</th><th style="width:18%">Date</th><th>Description of Change</th><th style="width:18%">By</th></tr></thead>
+    <tbody><tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr></tbody>
+  </table>
+</body>
+</html>`;
+
+  return { html, stepCount: sorted.length };
+}
+
+function previewSOP(){
+  const result = generateSOP();
+  if (!result) return;
+  const win = window.open('', '_blank');
+  if (!win){ showMsg('Preview blocked by the browser pop-up blocker - allow pop-ups for this page, or use Download SOP instead.', false); return; }
+  win.document.open();
+  win.document.write(result.html);
+  win.document.close();
+  clearMsg();
+}
+
+// ---------- Minimal DOCX (OOXML) writer - no external dependencies, works fully offline ----------
+function te(str){ return new TextEncoder().encode(str); }
+
+const CRC_TABLE = (function(){
+  const table = [];
+  for (let n=0;n<256;n++){
+    let c = n;
+    for (let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+function crc32(bytes){
+  let crc = 0xFFFFFFFF;
+  for (let i=0;i<bytes.length;i++) crc = CRC_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+function u16(n){ return [n & 0xFF, (n>>>8)&0xFF]; }
+function u32(n){ return [n&0xFF, (n>>>8)&0xFF, (n>>>16)&0xFF, (n>>>24)&0xFF]; }
+
+function buildZip(files){
+  // files: [{name, data: Uint8Array}] - STORED (uncompressed) entries, no external deps needed
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+  const time = 0, date = 0x21; // fixed placeholder DOS date (Jan 1 1980) - fine for generated docs
+
+  files.forEach(f=>{
+    const nameBytes = te(f.name);
+    const data = f.data;
+    const crc = crc32(data);
+    const size = data.length;
+
+    const localHeader = new Uint8Array([
+      0x50,0x4b,0x03,0x04,
+      ...u16(20), ...u16(0), ...u16(0),
+      ...u16(time), ...u16(date),
+      ...u32(crc), ...u32(size), ...u32(size),
+      ...u16(nameBytes.length), ...u16(0)
+    ]);
+    localParts.push(localHeader, nameBytes, data);
+
+    const centralHeader = new Uint8Array([
+      0x50,0x4b,0x01,0x02,
+      ...u16(20), ...u16(20), ...u16(0), ...u16(0),
+      ...u16(time), ...u16(date),
+      ...u32(crc), ...u32(size), ...u32(size),
+      ...u16(nameBytes.length), ...u16(0), ...u16(0),
+      ...u16(0), ...u16(0), ...u32(0),
+      ...u32(offset)
+    ]);
+    centralParts.push(centralHeader, nameBytes);
+
+    offset += localHeader.length + nameBytes.length + data.length;
+  });
+
+  const centralStart = offset;
+  const centralSize = centralParts.reduce((a,p)=>a+p.length,0);
+
+  const eocd = new Uint8Array([
+    0x50,0x4b,0x05,0x06,
+    ...u16(0), ...u16(0),
+    ...u16(files.length), ...u16(files.length),
+    ...u32(centralSize), ...u32(centralStart),
+    ...u16(0)
+  ]);
+
+  const allParts = [...localParts, ...centralParts, eocd];
+  const total = allParts.reduce((a,p)=>a+p.length,0);
+  const out = new Uint8Array(total);
+  let pos = 0;
+  allParts.forEach(p=>{ out.set(p, pos); pos += p.length; });
+  return out;
+}
+
+function docxEsc(s){
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function docxRunProps(opts={}){
+  let rpr = '';
+  if (opts.bold) rpr += '<w:b/><w:bCs/>';
+  if (opts.italic) rpr += '<w:i/><w:iCs/>';
+  if (opts.color) rpr += `<w:color w:val="${opts.color}"/>`;
+  if (opts.size) rpr += `<w:sz w:val="${opts.size}"/><w:szCs w:val="${opts.size}"/>`;
+  return rpr ? `<w:rPr>${rpr}</w:rPr>` : '';
+}
+function docxRun(text, opts={}){
+  return `<w:r>${docxRunProps(opts)}<w:t xml:space="preserve">${docxEsc(text)}</w:t></w:r>`;
+}
+function docxPara(text, opts={}){
+  let pPr = '';
+  if (opts.borderBottom) pPr += `<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="4" w:color="1A1A1A"/></w:pBdr>`;
+  if (opts.shading) pPr += `<w:shd w:val="clear" w:color="auto" w:fill="${opts.shading}"/>`;
+  const spacing = [];
+  if (opts.spacingBefore!==undefined) spacing.push(`w:before="${opts.spacingBefore}"`);
+  if (opts.spacingAfter!==undefined) spacing.push(`w:after="${opts.spacingAfter}"`);
+  if (spacing.length) pPr += `<w:spacing ${spacing.join(' ')}/>`;
+  if (opts.indent) pPr += `<w:ind w:left="${opts.indent}"/>`;
+  const pPrXml = pPr ? `<w:pPr>${pPr}</w:pPr>` : '';
+  return `<w:p>${pPrXml}${docxRun(text, opts)}</w:p>`;
+}
+function docxTcell(content, opts={}){
+  const paras = Array.isArray(content) ? content : [content];
+  const body = paras.length ? paras.map(p=>docxPara(p, opts.paraOpts||{})).join('') : docxPara('', opts.paraOpts||{});
+  let tcPr = `<w:tcW w:w="0" w:type="auto"/>`;
+  if (opts.span) tcPr += `<w:gridSpan w:val="${opts.span}"/>`;
+  if (opts.shading) tcPr += `<w:shd w:val="clear" w:color="auto" w:fill="${opts.shading}"/>`;
+  return `<w:tc><w:tcPr>${tcPr}</w:tcPr>${body}</w:tc>`;
+}
+function docxTrow(cells){ return `<w:tr>${cells.join('')}</w:tr>`; }
+function docxTable(rows, numCols){
+  const colw = Math.floor(9350/numCols);
+  const grid = Array(numCols).fill(0).map(()=>`<w:gridCol w:w="${colw}"/>`).join('');
+  const borders = `<w:tblBorders>
+    <w:top w:val="single" w:sz="4" w:color="999999"/><w:left w:val="single" w:sz="4" w:color="999999"/>
+    <w:bottom w:val="single" w:sz="4" w:color="999999"/><w:right w:val="single" w:sz="4" w:color="999999"/>
+    <w:insideH w:val="single" w:sz="4" w:color="999999"/><w:insideV w:val="single" w:sz="4" w:color="999999"/>
+  </w:tblBorders>`;
+  return `<w:tbl><w:tblPr>${borders}<w:tblW w:w="9350" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>${grid}</w:tblGrid>${rows.join('')}</w:tbl>`;
+}
+function docxStepCard(paragraphsXml){
+  const w = 9350;
+  return `<w:tbl><w:tblPr><w:tblBorders>
+    <w:top w:val="single" w:sz="4" w:color="CCCCCC"/><w:left w:val="single" w:sz="4" w:color="CCCCCC"/>
+    <w:bottom w:val="single" w:sz="4" w:color="CCCCCC"/><w:right w:val="single" w:sz="4" w:color="CCCCCC"/>
+  </w:tblBorders><w:tblW w:w="${w}" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="${w}"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/></w:tcPr>${paragraphsXml.join('')}</w:tc></w:tr></w:tbl>`;
+}
+const H2 = { bold:true, size:26, borderBottom:true, spacingBefore:240, spacingAfter:120 };
+const LABEL = { bold:true, size:16, color:'666666' };
+const MUTED = { italic:true, color:'777777', size:20 };
+const BODY = { size:20 };
+
+function buildSopDocxBody(){
+  syncStation();
+  if (!state.station.name){ showMsg('Add a Station / Machine Name before generating an SOP.', false); return null; }
+  if (!state.steps.length){ showMsg('Add at least one step before generating an SOP.', false); return null; }
+
+  const sorted = [...state.steps].sort((a,b)=>a.num-b.num);
+  const today = new Date().toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
+  const kcell = t => docxTcell(t, { shading:'F4F4F4', paraOpts:{bold:true, size:18} });
+  const hcell = t => docxTcell(t, { shading:'EEF1F6', paraOpts:{bold:true, size:18} });
+
+  let body = '';
+  body += docxPara('Standard Operating Procedure', { bold:true, size:36, spacingAfter:60 });
+  body += docxPara(state.station.name, { italic:true, color:'555555', size:24, spacingAfter:200 });
+
+  body += docxTable([
+    docxTrow([kcell('Station / Machine'), docxTcell(state.station.name), kcell('Date Generated'), docxTcell(today)]),
+    docxTrow([kcell('Revision'), docxTcell(''), kcell('Prepared By'), docxTcell('')]),
+    docxTrow([kcell('Approved By'), docxTcell(''), kcell('Approval Date'), docxTcell('')])
+  ], 4);
+
+  body += docxPara('1. Purpose & Scope', H2);
+  body += docxPara(`This procedure describes the standard operating sequence for ${state.station.name}. It is intended for trained operators and technicians responsible for running this station and covers the automatic operating cycle from start through completion.`, BODY);
+
+  body += docxPara('2. Safety Precautions', H2);
+  let safetyItems = [];
+  if (state.station.resetInput){
+    const rDesc = lookupIODesc(state.station.resetInput);
+    safetyItems.push(`Confirm the safety/interlock input ${state.station.resetInput}${rDesc ? ' ('+rDesc+')' : ''} is satisfied before starting the sequence. The routine automatically forces the station back to Step 0 if this input drops out at any point during the cycle.`);
+  }
+  if (state.steps.some(s=>s.watchdogSec)){
+    safetyItems.push(`This station uses step watchdog timers. If ${stationFaultTag()} is latched, the sequence has faulted on a stuck step${state.station.faultResetInput ? ' - clear it via '+state.station.faultResetInput+' only after the root cause is corrected' : ''}.`);
+  }
+  safetyItems.push('Follow site lockout/tagout (LOTO) procedures before performing any manual intervention on this station.');
+  safetyItems.push('Wear all PPE required for this work area per site policy.');
+  safetyItems.push('Do not bypass interlocks, guards, or safety devices referenced in this procedure.');
+  safetyItems.forEach(s => body += docxPara('•  ' + s, BODY));
+  body += docxPara('This section is generated from the interlock defined in the builder plus standard boilerplate - add any site- or process-specific hazards (pinch points, hot surfaces, pressurized lines, chemical exposure, etc.) before publishing this document.', MUTED);
+
+  body += docxPara('3. Equipment', H2);
+  const eqHeader = docxTrow(['Name','Type','Manufacturer','Model','Notes'].map(hcell));
+  const eqRows = state.equipment.length
+    ? state.equipment.map(eq => docxTrow([eq.name,eq.type,eq.manufacturer,eq.model,eq.notes].map(v=>docxTcell(v||''))))
+    : [docxTrow([docxTcell('No equipment recorded.', {span:5, paraOpts:MUTED})])];
+  body += docxTable([eqHeader, ...eqRows], 5);
+
+  const ioTable = (title, list) => {
+    body += docxPara(title, H2);
+    const header = docxTrow(['Tag','Description','Equipment'].map(hcell));
+    const rows = list.length
+      ? list.map(i => docxTrow([i.tag, i.desc, i.equipment].map(v=>docxTcell(v||''))))
+      : [docxTrow([docxTcell('None recorded.', {span:3, paraOpts:MUTED})])];
+    body += docxTable([header, ...rows], 3);
+  };
+  ioTable('4. Inputs Reference', state.inputs);
+  ioTable('5. Outputs Reference', state.outputs);
+
+  body += docxPara('6. Operating Sequence', H2);
+  sorted.forEach((st, idx) => {
+    const defaultNext = idx < sorted.length-1 ? sorted[idx+1].num : (state.station.cycleMode==='continuous' ? 0 : st.num);
+    const nextStep = (st.next===null || st.next===undefined || st.next==='') ? defaultNext : st.next;
+    const nextText = (nextStep === st.num)
+      ? `Holds at Step ${st.num} (end of cycle - requires reset to restart).`
+      : (nextStep === 0 && idx === sorted.length-1)
+        ? `Returns to Step 0 and the cycle repeats.`
+        : `Continues to Step ${nextStep}.`;
+
+    const paras = [];
+    paras.push(docxPara(`Step ${st.num}${st.desc ? ' - ' + st.desc : ''}`, { bold:true, size:22, shading:'EEF1F6', spacingAfter:80 }));
+    paras.push(docxPara('ACTION', { ...LABEL, spacingAfter:20 }));
+    if (st.outputsOn.length){
+      st.outputsOn.forEach(tag => paras.push(docxPara('•  ' + tag + (lookupIODesc(tag) ? ' - ' + lookupIODesc(tag) : ''), BODY)));
+    } else {
+      paras.push(docxPara('No outputs are activated during this step.', MUTED));
+    }
+    paras.push(docxPara('ADVANCE CONDITION', { ...LABEL, spacingBefore:100, spacingAfter:20 }));
+    if (st.mode === 'conditions'){
+      const groups = (st.condGroups||[]).filter(g=>g && g.length);
+      if (groups.length){
+        paras.push(docxPara(groups.length>1
+          ? 'Proceeds to the next step when any of the following groups are true (each group requires all its conditions):'
+          : 'Proceeds to the next step once all of the following are true:', BODY));
+        groups.forEach((g,gi)=>{
+          if (groups.length>1) paras.push(docxPara(`Group ${gi+1}${gi>0?' (OR)':''}:`, MUTED));
+          g.forEach(tag => paras.push(docxPara('•  ' + tag + (lookupIODesc(tag) ? ' - ' + lookupIODesc(tag) : ''), BODY)));
+        });
+      } else {
+        paras.push(docxPara('Proceeds to the next step immediately (no conditions defined).', MUTED));
+      }
+    } else if (st.mode === 'timer'){
+      paras.push(docxPara(`Proceeds automatically after ${st.timeoutSec ?? 0} seconds.`, BODY));
+    } else {
+      paras.push(docxPara('Advances manually or is triggered by an external routine - no automatic condition.', MUTED));
+    }
+    if (st.watchdogSec){
+      paras.push(docxPara(`Watchdog: if this step has not advanced within ${st.watchdogSec} seconds, ${stationFaultTag()} latches${(state.station.faultStep!==null && state.station.faultStep!==undefined) ? ' and the sequence jumps to Step '+state.station.faultStep : ''}.`, MUTED));
+    }
+    paras.push(docxPara('NEXT', { ...LABEL, spacingBefore:100, spacingAfter:20 }));
+    paras.push(docxPara(nextText, BODY));
+
+    body += docxStepCard(paras);
+    body += docxPara('', { spacingAfter:60 });
+  });
+
+  body += docxPara('7. Revision History', H2);
+  body += docxTable([
+    docxTrow(['Rev','Date','Description of Change','By'].map(hcell)),
+    docxTrow(['','','',''].map(v=>docxTcell(v)))
+  ], 4);
+
+  return body;
+}
+
+function buildSopDocx(){
+  const bodyContent = buildSopDocxBody();
+  if (bodyContent === null) return null;
+
+  const sectPr = `<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>`;
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<w:body>${bodyContent}${sectPr}</w:body>
+</w:document>`;
+
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+</Types>`;
+
+  const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+</Relationships>`;
+
+  const nowIso = new Date().toISOString();
+  const core = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<dc:title>${docxEsc('SOP - ' + state.station.name)}</dc:title>
+<dc:creator>Station Sequence Builder</dc:creator>
+<cp:lastModifiedBy>Station Sequence Builder</cp:lastModifiedBy>
+<dcterms:created xsi:type="dcterms:W3CDTF">${nowIso}</dcterms:created>
+<dcterms:modified xsi:type="dcterms:W3CDTF">${nowIso}</dcterms:modified>
+</cp:coreProperties>`;
+
+  const app = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+<Application>Station Sequence Builder</Application>
+</Properties>`;
+
+  const files = [
+    { name:'[Content_Types].xml', data: te(contentTypes) },
+    { name:'_rels/.rels', data: te(rels) },
+    { name:'docProps/core.xml', data: te(core) },
+    { name:'docProps/app.xml', data: te(app) },
+    { name:'word/document.xml', data: te(documentXml) }
+  ];
+  return { bytes: buildZip(files), stepCount: state.steps.length };
+}
+
+function downloadSOP(){
+  const result = buildSopDocx();
+  if (!result) return;
+  const blob = new Blob([result.bytes], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'SOP_' + (state.station.name || 'Station').replace(/[^A-Za-z0-9_]/g,'_') + '.docx';
+  a.click();
+  showMsg(`SOP (.docx) generated with ${result.stepCount} step(s). Open it in Word to review, format, and add site-specific safety details before publishing.`, true);
+}
+
+// ---------- Flowchart (SVG, no external dependencies) ----------
+function shortText(s, max){
+  s = s || '';
+  return s.length > max ? s.slice(0, Math.max(0,max-1)) + '…' : s;
+}
+function wrapLines(s, maxLen, maxLines){
+  s = (s||'').trim();
+  const lines = [];
+  let rest = s;
+  while (rest.length > 0 && lines.length < maxLines){
+    if (rest.length <= maxLen){ lines.push(rest); rest=''; break; }
+    let cut = rest.lastIndexOf(' ', maxLen);
+    if (cut <= 0) cut = maxLen;
+    lines.push(rest.slice(0,cut));
+    rest = rest.slice(cut).trim();
+  }
+  if (rest.length > 0 && lines.length){
+    lines[lines.length-1] = shortText(lines[lines.length-1] + ' ' + rest, maxLen+2);
+  }
+  return lines;
+}
+
+function generateFlowchartSVG(){
+  syncStation();
+  if (!state.steps.length){ showMsg('Add at least one step before generating a flowchart.', false); return null; }
+
+  const sorted = [...state.steps].sort((a,b)=>a.num-b.num);
+  const byNum = {}; sorted.forEach(s=>{ byNum[s.num]=s; });
+
+  const boxW = 280, boxH = 68, gapY = 90, marginX = 210, marginTop = 90;
+  const laneGap = 46;
+  const centerX = marginX + boxW/2;
+
+  const posY = {};
+  sorted.forEach((st,i)=>{ posY[st.num] = marginTop + i*(boxH+gapY); });
+
+  const edges = sorted.map((st, idx) => {
+    const defaultNext = idx < sorted.length-1 ? sorted[idx+1].num : (state.station.cycleMode==='continuous' ? 0 : st.num);
+    const nextStep = (st.next===null || st.next===undefined || st.next==='') ? defaultNext : st.next;
+    const sequential = (idx < sorted.length-1) && nextStep === sorted[idx+1].num;
+    let label, dashed = false;
+    if (st.mode === 'conditions'){ label = condGroupsText(st.condGroups) || 'immediate'; }
+    else if (st.mode === 'timer'){ label = (st.timeoutSec ?? 0) + 's'; }
+    else { label = 'manual'; dashed = true; }
+    return {
+      fromNum: st.num, toNum: nextStep, sequential, label, dashed,
+      selfHold: nextStep === st.num, targetExists: byNum[nextStep] !== undefined
+    };
+  });
+
+  let laneCount = 0;
+  edges.forEach(e=>{
+    if (!e.sequential && !e.selfHold && e.targetExists){ e.lane = laneCount++; }
+  });
+
+  const svgW = marginX + boxW + 70 + laneCount*laneGap + 60;
+  const svgH = marginTop + sorted.length*(boxH+gapY) + 30;
+
+  let parts = [];
+  parts.push(`<rect x="0" y="0" width="${svgW}" height="${svgH}" fill="#ffffff"/>`);
+  parts.push(`<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2a5cc9"/></marker>
+    <marker id="arrowGold" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b6f00"/></marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/></marker></defs>`);
+
+  const firstY = posY[sorted[0].num];
+  parts.push(`<ellipse cx="${centerX}" cy="${marginTop-40}" rx="60" ry="20" fill="#2a5cc9"/>`);
+  parts.push(`<text x="${centerX}" y="${marginTop-35}" text-anchor="middle" font-size="12" fill="#fff" font-weight="bold">START</text>`);
+  parts.push(`<line x1="${centerX}" y1="${marginTop-20}" x2="${centerX}" y2="${firstY}" stroke="#2a5cc9" stroke-width="2" marker-end="url(#arrow)"/>`);
+
+  if (state.station.resetInput && byNum[0]){
+    const y0 = posY[0];
+    const noteX = 10;
+    parts.push(`<rect x="${noteX}" y="${y0+boxH/2-24}" width="180" height="48" rx="6" fill="#fff5f5" stroke="#c0392b" stroke-dasharray="4,3"/>`);
+    parts.push(`<text x="${noteX+10}" y="${y0+boxH/2-6}" font-size="10.5" fill="#8b1a1a">${esc('WARNING: ' + shortText(state.station.resetInput,22))}</text>`);
+    parts.push(`<text x="${noteX+10}" y="${y0+boxH/2+9}" font-size="10.5" fill="#8b1a1a">not OK forces this step</text>`);
+    parts.push(`<line x1="${noteX+180}" y1="${y0+boxH/2}" x2="${marginX}" y2="${y0+boxH/2}" stroke="#c0392b" stroke-width="1.6" stroke-dasharray="4,3" marker-end="url(#arrowRed)"/>`);
+  }
+
+  sorted.forEach(st=>{
+    const y = posY[st.num];
+    const lines = wrapLines(st.desc, 30, 2);
+    parts.push(`<rect x="${marginX}" y="${y}" width="${boxW}" height="${boxH}" rx="8" fill="#eef1f6" stroke="#2a5cc9" stroke-width="1.6"/>`);
+    parts.push(`<text x="${centerX}" y="${y+20}" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#1a1a1a">${esc('Step ' + st.num)}</text>`);
+    lines.forEach((line,li)=>{
+      parts.push(`<text x="${centerX}" y="${y+36+li*14}" text-anchor="middle" font-size="10.5" fill="#333">${esc(line)}</text>`);
+    });
+    if (st.watchdogSec){
+      const bw = 62;
+      parts.push(`<rect x="${marginX+boxW-bw+10}" y="${y-10}" width="${bw}" height="16" rx="8" fill="#c0392b"/>`);
+      parts.push(`<text x="${marginX+boxW-bw/2+10}" y="${y+1}" text-anchor="middle" font-size="9" fill="#fff" font-weight="bold">${esc('WD ' + st.watchdogSec + 's')}</text>`);
+    }
+  });
+
+  edges.forEach(e=>{
+    const yA = posY[e.fromNum];
+    const dash = e.dashed ? ` stroke-dasharray="5,4"` : '';
+    if (e.selfHold){
+      const rx = marginX+boxW;
+      const path = `M ${rx} ${yA+boxH*0.3} C ${rx+42} ${yA}, ${rx+42} ${yA+boxH}, ${rx} ${yA+boxH*0.7}`;
+      parts.push(`<path d="${path}" fill="none" stroke="#8b6f00" stroke-width="1.8"${dash} marker-end="url(#arrowGold)"/>`);
+      parts.push(`<text x="${rx+48}" y="${yA+boxH/2+4}" font-size="10" fill="#8b6f00">${esc(shortText(e.label,20) + ' (hold)')}</text>`);
+      return;
+    }
+    if (!e.targetExists){
+      parts.push(`<line x1="${centerX}" y1="${yA+boxH}" x2="${centerX}" y2="${yA+boxH+28}" stroke="#c0392b" stroke-width="1.8"${dash} marker-end="url(#arrowRed)"/>`);
+      parts.push(`<text x="${centerX+8}" y="${yA+boxH+22}" font-size="10" fill="#c0392b">${esc('WARNING: Step ' + e.toNum + ' not found')}</text>`);
+      return;
+    }
+    const yB = posY[e.toNum];
+    if (e.sequential){
+      const midY = (yA+boxH+yB)/2;
+      parts.push(`<line x1="${centerX}" y1="${yA+boxH}" x2="${centerX}" y2="${yB}" stroke="#2a5cc9" stroke-width="1.8"${dash} marker-end="url(#arrow)"/>`);
+      const lbl = shortText(e.label,42);
+      parts.push(`<rect x="${centerX+6}" y="${midY-9}" width="${Math.min(240, 12+lbl.length*5.6)}" height="16" fill="#ffffff"/>`);
+      parts.push(`<text x="${centerX+8}" y="${midY+3}" font-size="10" fill="#444">${esc(lbl)}</text>`);
+    } else {
+      const laneX = marginX + boxW + 30 + e.lane*laneGap;
+      const y1 = yA + boxH/2, y2 = yB + boxH/2;
+      const path = `M ${marginX+boxW} ${y1} L ${laneX} ${y1} L ${laneX} ${y2} L ${marginX+boxW} ${y2}`;
+      parts.push(`<path d="${path}" fill="none" stroke="#8b6f00" stroke-width="1.8"${dash} marker-end="url(#arrowGold)"/>`);
+      const labelY = (y1+y2)/2;
+      const lbl = shortText(e.label,30) + ' → Step ' + e.toNum;
+      parts.push(`<rect x="${laneX+4}" y="${labelY-9}" width="${Math.min(220, 12+lbl.length*5.4)}" height="16" fill="#fffdf5"/>`);
+      parts.push(`<text x="${laneX+7}" y="${labelY+3}" font-size="10" fill="#6b5400">${esc(lbl)}</text>`);
+    }
+  });
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgW} ${svgH}" width="${svgW}" height="${svgH}" font-family="Arial, Helvetica, sans-serif">${parts.join('')}</svg>`;
+  return { svg, stepCount: sorted.length, edgeCount: edges.length, laneCount, width: svgW, height: svgH };
+}
+
+function toggleFlowchart(){
+  const panel = document.getElementById('flowchart-preview');
+  if (panel.classList.contains('show')){ panel.classList.remove('show'); panel.innerHTML=''; return; }
+  const result = generateFlowchartSVG();
+  if (!result){ panel.classList.remove('show'); return; }
+  panel.innerHTML = result.svg;
+  panel.classList.add('show');
+  clearMsg();
+}
+
+function downloadFlowchart(){
+  const result = generateFlowchartSVG();
+  if (!result) return;
+  const blob = new Blob([result.svg], {type:'image/svg+xml'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Flowchart_' + (state.station.name || 'Station').replace(/[^A-Za-z0-9_]/g,'_') + '.svg';
+  a.click();
+  showMsg(`Flowchart generated with ${result.stepCount} step(s) and ${result.edgeCount} transition(s). SVG opens in any browser and can be dropped into the SOP or printed directly.`, true);
+}
+
+// ---------- Tag list CSV export ----------
+function csvField(v){
+  const s = String(v ?? '');
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+function generateTagListCSV(){
+  syncStation();
+  const rows = [['Tag','Description','Data Type','Direction','Source','Equipment','Address / Module Member']];
+  const stepTagName = (state.station.name ? state.station.name.replace(/[^A-Za-z0-9_]/g,'_') : 'Station') + '_Step';
+  rows.push([stepTagName, 'Sequence step number for ' + (state.station.name||'station'), 'DINT', 'Internal', 'Generic', '', '']);
+
+  const addIO = (item, dir) => {
+    const aliasFor = (item.source==='eds') ? `${item.equipment}:${dir}.${item.member}` : '';
+    rows.push([
+      item.tag, item.desc, item.dtype, dir==='I'?'Input':'Output',
+      item.source==='eds' ? 'EDS Member' : 'Generic',
+      item.equipment || '',
+      item.source==='eds' ? aliasFor : (item.addr || '')
+    ]);
+  };
+  state.inputs.forEach(i=>addIO(i,'I'));
+  state.outputs.forEach(o=>addIO(o,'O'));
+
+  const sorted = [...state.steps].sort((a,b)=>a.num-b.num);
+  sorted.forEach(st=>{
+    if (st.mode==='timer'){
+      rows.push(['Step'+st.num+'_TMR', `Step ${st.num} advance timer (${st.timeoutSec ?? 0}s)`, 'TIMER', 'Internal', 'Generic', '', '']);
+    }
+    if (st.watchdogSec){
+      rows.push(['Step'+st.num+'_WD', `Step ${st.num} watchdog (${st.watchdogSec}s max time in step)`, 'TIMER', 'Internal', 'Generic', '', '']);
+    }
+  });
+  if (state.steps.some(s=>s.watchdogSec)){
+    rows.push([stationFaultTag(), 'Latched fault - set when a step watchdog times out', 'BOOL', 'Internal', 'Generic', '', '']);
+  }
+
+  return rows.map(r=>r.map(csvField).join(',')).join('\r\n');
+}
+function downloadTagListCSV(){
+  syncStation();
+  if (!state.inputs.length && !state.outputs.length && !state.steps.length){
+    showMsg('Add some inputs, outputs, or steps before exporting a tag list.', false);
+    return;
+  }
+  const csv = generateTagListCSV();
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'TagList_' + (state.station.name || 'Station').replace(/[^A-Za-z0-9_]/g,'_') + '.csv';
+  a.click();
+  showMsg('Tag list CSV downloaded.', true);
+}
+
+// ---------- Validation ----------
+function validateStation(){
+  syncStation();
+  const errors = [];
+  const warnings = [];
+  const infos = [];
+
+  const inTags = state.inputs.map(i=>i.tag).filter(Boolean);
+  const outTags = state.outputs.map(o=>o.tag).filter(Boolean);
+  const allTags = [...inTags, ...outTags];
+  const dupeTags = [...new Set(allTags.filter((t,i)=>allTags.indexOf(t)!==i))];
+  if (dupeTags.length) errors.push('Duplicate tag names: ' + dupeTags.join(', '));
+
+  state.inputs.forEach(i=>{ if (i.tag && !validTag(i.tag)) errors.push(`Input tag "${i.tag}" is not a valid Logix tag name.`); });
+  state.outputs.forEach(o=>{ if (o.tag && !validTag(o.tag)) errors.push(`Output tag "${o.tag}" is not a valid Logix tag name.`); });
+
+  const dupeSteps = [];
+  state.steps.forEach((s,i)=>{
+    if (state.steps.some((s2,j)=> j>i && s2.num===s.num)) dupeSteps.push(s.num);
+  });
+  if (dupeSteps.length) errors.push('Duplicate step numbers: ' + [...new Set(dupeSteps)].join(', '));
+
+  // Referenced tags: outputs used in any step's outputsOn, inputs used in any condition group / reset / fault reset
+  const usedOutputs = new Set();
+  const usedInputs = new Set();
+  if (state.station.resetInput) usedInputs.add(state.station.resetInput);
+  if (state.station.faultResetInput) usedInputs.add(state.station.faultResetInput);
+  state.steps.forEach(st=>{
+    st.outputsOn.forEach(t=>usedOutputs.add(t));
+    (st.condGroups||[]).forEach(g=>(g||[]).forEach(t=>usedInputs.add(t)));
+  });
+  const orphanInputs = inTags.filter(t=>!usedInputs.has(t));
+  const orphanOutputs = outTags.filter(t=>!usedOutputs.has(t));
+  if (orphanInputs.length) warnings.push('Inputs defined but never referenced by any step condition or reset input: ' + orphanInputs.join(', '));
+  if (orphanOutputs.length) warnings.push('Outputs defined but never activated by any step: ' + orphanOutputs.join(', '));
+
+  // Reachability: a step is reachable if it's the first (lowest-numbered) step, or some step's actual next points to it
+  if (state.steps.length){
+    const sorted = [...state.steps].sort((a,b)=>a.num-b.num);
+    const byNum = {}; sorted.forEach(s=>byNum[s.num]=s);
+    const reachable = new Set([sorted[0].num]);
+    const danglingRefs = [];
+    sorted.forEach((st, idx)=>{
+      const defaultNext = idx < sorted.length-1 ? sorted[idx+1].num : (state.station.cycleMode==='continuous' ? 0 : st.num);
+      const nextStep = (st.next===null || st.next===undefined || st.next==='') ? defaultNext : st.next;
+      if (nextStep !== st.num){
+        if (byNum[nextStep] !== undefined) reachable.add(nextStep);
+        else danglingRefs.push(`Step ${st.num} -> Step ${nextStep} (does not exist)`);
+      }
+    });
+    if (state.station.faultStep !== null && state.station.faultStep !== undefined){
+      if (byNum[state.station.faultStep] !== undefined) reachable.add(state.station.faultStep);
+      else danglingRefs.push(`Fault Step -> Step ${state.station.faultStep} (does not exist)`);
+    }
+    const unreachable = sorted.filter(s=>!reachable.has(s.num)).map(s=>s.num);
+    if (unreachable.length) warnings.push('Steps nothing transitions into (unreachable): ' + unreachable.join(', '));
+    if (danglingRefs.length) errors.push('Transitions pointing at step numbers that do not exist: ' + danglingRefs.join('; '));
+
+    state.steps.forEach(st=>{
+      if (st.mode==='conditions'){
+        const groups = (st.condGroups||[]).filter(g=>g&&g.length);
+        if (!groups.length) infos.push(`Step ${st.num} has no advance conditions defined - it will fall through immediately.`);
+      }
+    });
+  } else {
+    warnings.push('No steps defined yet.');
+  }
+
+  const edsIssues = [];
+  state.equipment.filter(e=>e.usesEds).forEach(eq=>{
+    if (!eq.moduleTagName) edsIssues.push(`Equipment "${eq.name}" is flagged EDS but has no Module Tag Name.`);
+    if (!eq.edsMembers || !eq.edsMembers.length) edsIssues.push(`Equipment "${eq.name}" is flagged EDS but has no members defined.`);
+  });
+  if (edsIssues.length) warnings.push(...edsIssues);
+
+  return { errors, warnings, infos };
+}
+
+function runValidation(){
+  const { errors, warnings, infos } = validateStation();
+  const panel = document.getElementById('validation-results');
+  let html = '';
+  if (errors.length){
+    html += `<div class="vgroup errs"><h4>Errors (${errors.length})</h4><ul>${errors.map(e=>`<li>${esc(e)}</li>`).join('')}</ul></div>`;
+  }
+  if (warnings.length){
+    html += `<div class="vgroup warns"><h4>Warnings (${warnings.length})</h4><ul>${warnings.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`;
+  }
+  if (infos.length){
+    html += `<div class="vgroup warns"><h4>Notes (${infos.length})</h4><ul>${infos.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`;
+  }
+  if (!errors.length && !warnings.length && !infos.length){
+    html = `<div class="vgroup ok"><h4>All clear</h4><ul><li>No orphaned I/O, duplicate tags/steps, or unreachable steps found.</li></ul></div>`;
+  }
+  panel.innerHTML = html;
+  panel.classList.add('show');
+  clearMsg();
+}
+
 // ---------- init ----------
 renderEquipment();
 renderInputs();
 renderOutputs();
 renderSteps();
 refreshResetOptions();
+tryRestoreAutosave();
 </script>
 </body>
 </html>
