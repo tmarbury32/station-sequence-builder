@@ -35,6 +35,9 @@
   section > .hint{color:var(--muted); font-size:12.5px; margin:0 0 14px;}
   .grid{display:grid; gap:10px;}
   .grid-station{grid-template-columns:repeat(2,1fr);}
+  .grid-project{grid-template-columns:repeat(3,1fr);}
+  .existing-l5x{margin-top:16px; padding-top:14px; border-top:1px solid var(--border);}
+  .existing-l5x label{margin-bottom:0;}
   label{display:block; font-size:12px; color:var(--muted); margin-bottom:4px;}
   input[type=text], input[type=number], select, textarea{
     width:100%; background:var(--panel2); border:1px solid var(--border);
@@ -66,6 +69,11 @@
   .add-row{margin-top:8px;}
   .toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:22px 0;}
   .toolbar .spacer{flex:1;}
+  .save-dest-bar{display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin:0; padding:12px 16px; background:var(--panel); border:1px solid var(--border); border-radius:10px;}
+  .save-dest-bar label{margin:0; font-size:12.5px;}
+  .save-dest-bar select{width:auto; min-width:160px;}
+  .save-dest-bar .ask-loc{display:flex; align-items:center; gap:5px; color:var(--muted);}
+  #cloud-auth-status{font-size:12px;}
   .chips{display:flex; flex-wrap:wrap; gap:6px;}
   .chip{
     display:inline-flex; align-items:center; gap:5px; background:var(--panel2);
@@ -83,6 +91,19 @@
   .ms-panel label{display:flex; gap:6px; align-items:center; font-size:12.5px; color:var(--text); padding:3px 2px; margin:0;}
   .radio-group{display:flex; gap:14px; align-items:center; font-size:12.5px;}
   .radio-group label{display:flex; gap:5px; align-items:center; color:var(--text); margin:0;}
+  .info-tip{position:relative; display:inline-block; margin-left:5px; vertical-align:middle;}
+  .info-tip-btn{
+    width:15px; height:15px; border-radius:50%; background:var(--panel2); border:1px solid var(--border);
+    color:var(--muted); font-size:10.5px; font-style:italic; font-family:Georgia,serif; line-height:1;
+    display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:0;
+  }
+  .info-tip-btn:hover{border-color:var(--accent); color:var(--accent);}
+  .info-tip-panel{
+    display:none; position:absolute; z-index:30; top:135%; left:0; width:290px;
+    background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:10px 12px;
+    font-size:12px; color:var(--text); line-height:1.5; box-shadow:0 8px 24px rgba(0,0,0,.4);
+  }
+  .info-tip.open .info-tip-panel{display:block;}
   #preview{
     white-space:pre-wrap; font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
     font-size:11.5px; background:#0b0f1a; border:1px solid var(--border); border-radius:8px;
@@ -128,6 +149,105 @@
 
 <main>
 
+  <section id="sec-project">
+    <h2>Pre-Project Info</h2>
+    <p class="hint">A few basic questions about this project's controller and site context. These feed the SOP, the generated L5X's Studio 5000 version, and a couple of validation checks &mdash; they don't need to be exact, just your best answer for now.</p>
+    <div class="grid grid-project">
+      <div>
+        <label>Safety PLC in use?</label>
+        <div class="radio-group">
+          <label><input type="radio" name="pp-safetyplc" id="pp-safetyplc-yes" value="yes"> Yes</label>
+          <label><input type="radio" name="pp-safetyplc" id="pp-safetyplc-no" value="no" checked> No</label>
+        </div>
+      </div>
+      <div>
+        <label>Controller Platform</label>
+        <select id="pp-platform">
+          <option value="">(not specified)</option>
+          <option value="controllogix">ControlLogix</option>
+          <option value="compactlogix">CompactLogix</option>
+          <option value="guardlogix">GuardLogix</option>
+          <option value="compactguardlogix">CompactGuardLogix</option>
+          <option value="micro800">Micro800</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label>Studio 5000 Version<span class="info-tip"><button type="button" class="info-tip-btn" onclick="event.stopPropagation(); toggleInfoTip(this)" aria-label="Why is v36 missing?">i</button><div class="info-tip-panel">v36.00.02&ndash;37.00.02 is removed from this list &mdash; Rockwell's advisory for CVE-2025-7971 (unsafe environment-variable handling, can allow code execution) says to update to 37.00.02 or later. If you're on an older v37 patch, update Studio 5000 before continuing.</div></span></label>
+        <select id="pp-version">
+          <option value="v38" selected>v38</option>
+          <option value="v37">v37 (must be 37.00.02 or later)</option>
+          <option value="v35">v35</option>
+          <option value="v34">v34</option>
+          <option value="v33">v33</option>
+          <option value="v32">v32</option>
+          <option value="v30">v30</option>
+          <option value="other">Not sure / other</option>
+        </select>
+      </div>
+      <div>
+        <label>New or Existing Project?</label>
+        <select id="pp-projecttype">
+          <option value="new" selected>New Studio 5000 project</option>
+          <option value="existing">Existing / live controller project</option>
+        </select>
+      </div>
+      <div>
+        <label>Tag Naming Convention</label>
+        <select id="pp-tagconvention">
+          <option value="">(not specified)</option>
+          <option value="isa">ISA-5.1/88 style</option>
+          <option value="company">Company-specific standard</option>
+          <option value="none">No formal convention</option>
+        </select>
+      </div>
+      <div>
+        <label>Remote I/O Architecture</label>
+        <select id="pp-remoteio">
+          <option value="">(not specified)</option>
+          <option value="local">Local chassis I/O only</option>
+          <option value="eip-remote">EtherNet/IP remote I/O (Point I/O, FLEX5000, ArmorBlock, etc.)</option>
+          <option value="devicenet">DeviceNet</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label>HMI / SCADA Platform</label>
+        <select id="pp-hmi">
+          <option value="">(not specified)</option>
+          <option value="ignition">Ignition</option>
+          <option value="ftview-se">FactoryTalk View SE</option>
+          <option value="ftview-me">FactoryTalk View ME</option>
+          <option value="none">None yet</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label>Target Cycle Time (optional)</label>
+        <input type="text" id="pp-cycletime" placeholder="e.g. 45 sec/cycle or 80 parts/hr">
+      </div>
+      <div>
+        <label>E-Stop / Interlock Architecture</label>
+        <select id="pp-estoparch">
+          <option value="">(not specified)</option>
+          <option value="hardwired">Hardwired series E-stop chain</option>
+          <option value="safety-network">Safety-rated network (GuardLink, safety I/O)</option>
+          <option value="combination">Combination of hardwired + safety network</option>
+          <option value="na">N/A &ndash; no safety devices on this station</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="existing-l5x">
+      <label>Compare Against Existing Program (optional)</label>
+      <p class="hint" style="margin:2px 0 8px;">Upload the L5X for the existing Studio 5000 project or program you're importing into &mdash; a full project export or a single routine/program export both work. Validate Station will then flag tag name collisions and whether the Program/Routine names in Station Info already exist there. Parsed entirely in your browser; not saved with your config or autosave.</p>
+      <input type="file" id="existing-l5x-file" accept=".l5x,.L5X,.xml" onchange="handleExistingL5XUpload(event)">
+      <button type="button" onclick="document.getElementById('existing-l5x-file').click()">Upload Existing L5X&hellip;</button>
+      <button type="button" class="ghost small" id="existing-l5x-clear" onclick="clearExistingProject()" style="display:none; margin-left:6px;">Clear</button>
+      <div id="existing-l5x-status" class="hint" style="margin-top:8px;"></div>
+    </div>
+  </section>
+
   <section id="sec-station">
     <h2>Station Info</h2>
     <p class="hint">This information names the generated routine. It does not need to match an existing controller &mdash; the L5X import will create tags in your project if they don't already exist.</p>
@@ -139,10 +259,6 @@
       <div>
         <label>Routine Name</label>
         <input type="text" id="st-routine" placeholder="e.g. R_Station10_Sequence">
-      </div>
-      <div>
-        <label>Program Name (in Studio 5000)</label>
-        <input type="text" id="st-program" value="MainProgram">
       </div>
       <div>
         <label>Cycle Mode</label>
@@ -157,7 +273,7 @@
       </div>
       <div>
         <label>&nbsp;</label>
-        <p class="hint" style="margin:6px 0 0;">If selected, the routine forces Step = 0 any time this input is OFF (e-stop / gate / interlock chain).</p>
+        <p class="hint" id="reset-hint" style="margin:6px 0 0;">If selected, the routine forces Step = 0 any time this input is OFF (e-stop / gate / interlock chain).</p>
       </div>
       <div>
         <label>Fault Tag Name (optional)</label>
@@ -241,6 +357,20 @@
     <button class="add-row" onclick="addStep()">+ Add Step</button>
   </section>
 
+  <div class="save-dest-bar">
+    <label>Save destination:</label>
+    <select id="save-dest" onchange="onSaveDestChange()">
+      <option value="device" selected>This device (download)</option>
+      <option value="google">Google Drive</option>
+      <option value="onedrive">OneDrive</option>
+      <option value="dropbox">Dropbox</option>
+    </select>
+    <label class="ask-loc" id="save-ask-location-wrap">
+      <input type="checkbox" id="save-ask-location"> Ask where to save on this device (Chrome/Edge only)
+    </label>
+    <span id="cloud-auth-status"></span>
+  </div>
+
   <div class="toolbar">
     <button class="good primary" onclick="doGenerate()">&#11015; Generate L5X</button>
     <button onclick="togglePreview()">Preview XML / Tags</button>
@@ -271,6 +401,7 @@
 // ---------- State ----------
 let state = {
   station: { name:'', routine:'', program:'MainProgram', cycleMode:'continuous', resetInput:'', faultTag:'', faultStep:null, faultResetInput:'' },
+  project: { safetyPlc:false, platform:'', studioVersion:'v38', projectType:'new', tagConvention:'', remoteIo:'', hmi:'', cycleTime:'', estopArch:'' },
   equipment: [],
   inputs: [],
   outputs: [],
@@ -278,6 +409,51 @@ let state = {
 };
 let uid = 1;
 const newId = () => 'id' + (uid++);
+
+// ---------- Pre-project info ----------
+const STUDIO_VERSION_MAP = { v38:'38.00', v37:'37.00', v36:'36.00', v35:'35.00', v34:'34.00', v33:'33.00', v32:'32.00', v30:'30.00' };
+const PP_LABELS = {
+  platform: { controllogix:'ControlLogix', compactlogix:'CompactLogix', guardlogix:'GuardLogix', compactguardlogix:'CompactGuardLogix', micro800:'Micro800', other:'Other' },
+  studioVersion: { v38:'Studio 5000 v38', v37:'Studio 5000 v37 (37.00.02+)', v36:'Studio 5000 v36 (CVE-2025-7971 - upgrade)', v35:'Studio 5000 v35', v34:'Studio 5000 v34', v33:'Studio 5000 v33', v32:'Studio 5000 v32', v30:'Studio 5000 v30', other:'Not sure / other' },
+  projectType: { new:'New Studio 5000 project', existing:'Existing / live controller project' },
+  tagConvention: { isa:'ISA-5.1/88 style', company:'Company-specific standard', none:'No formal convention' },
+  remoteIo: { local:'Local chassis I/O only', 'eip-remote':'EtherNet/IP remote I/O (Point I/O, FLEX5000, ArmorBlock, etc.)', devicenet:'DeviceNet', other:'Other' },
+  hmi: { ignition:'Ignition', 'ftview-se':'FactoryTalk View SE', 'ftview-me':'FactoryTalk View ME', none:'None yet', other:'Other' },
+  estopArch: { hardwired:'Hardwired series E-stop chain', 'safety-network':'Safety-rated network (GuardLink, safety I/O)', combination:'Combination of hardwired + safety network', na:'N/A - no safety devices on this station' }
+};
+function ppLabel(field, value){ return (PP_LABELS[field] && PP_LABELS[field][value]) || value || ''; }
+function syncProject(){
+  state.project.safetyPlc = document.getElementById('pp-safetyplc-yes').checked;
+  state.project.platform = document.getElementById('pp-platform').value;
+  state.project.studioVersion = document.getElementById('pp-version').value;
+  state.project.projectType = document.getElementById('pp-projecttype').value;
+  state.project.tagConvention = document.getElementById('pp-tagconvention').value;
+  state.project.remoteIo = document.getElementById('pp-remoteio').value;
+  state.project.hmi = document.getElementById('pp-hmi').value;
+  state.project.cycleTime = document.getElementById('pp-cycletime').value.trim();
+  state.project.estopArch = document.getElementById('pp-estoparch').value;
+  updateSafetyHint();
+  autosave();
+}
+function updateSafetyHint(){
+  const el = document.getElementById('reset-hint');
+  if (!el) return;
+  el.textContent = state.project.safetyPlc
+    ? 'If selected, the routine forces Step = 0 any time this input is OFF. Since a Safety PLC is in use, this should typically be a status bit fed from the safety controller/task (e.g. a GuardLogix-mapped "SafetyOK" tag) rather than a raw hardwired E-stop input.'
+    : 'If selected, the routine forces Step = 0 any time this input is OFF (e-stop / gate / interlock chain).';
+}
+['pp-safetyplc-yes','pp-safetyplc-no','pp-platform','pp-version','pp-projecttype','pp-tagconvention','pp-remoteio','pp-hmi','pp-cycletime','pp-estoparch'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', syncProject);
+  document.getElementById(id).addEventListener('input', syncProject);
+});
+document.getElementById('pp-platform').addEventListener('change', ()=>{
+  const v = document.getElementById('pp-platform').value;
+  if (v === 'guardlogix' || v === 'compactguardlogix'){
+    document.getElementById('pp-safetyplc-yes').checked = true;
+    document.getElementById('pp-safetyplc-no').checked = false;
+    syncProject();
+  }
+});
 
 // ---------- Generic helpers ----------
 function esc(s){
@@ -325,15 +501,225 @@ function tryRestoreAutosave(){
   showMsg('Restored your last autosaved session.', true);
 }
 
+// ---------- Save destinations: this device, or Google Drive / OneDrive / Dropbox ----------
+// To enable a cloud provider, register a free app with that provider and paste the resulting
+// Client ID (App Key) below. The redirect URI you register with each provider must be this
+// page's own URL exactly (e.g. https://yourname.github.io/station-sequence-builder/). No secret
+// is required or stored - only a public client ID, which is safe to leave in this file.
+const CLOUD_CONFIG = {
+  google:   { clientId: '', scope: 'https://www.googleapis.com/auth/drive.file' },
+  onedrive: { clientId: '', scope: 'Files.ReadWrite' },
+  dropbox:  { clientId: '' }
+};
+const cloudTokens = { google:null, onedrive:null, dropbox:null }; // in-memory only for this tab - never saved to config/autosave/localStorage
+
+function cloudLabel(key){
+  return { google:'Google Drive', onedrive:'OneDrive', dropbox:'Dropbox' }[key] || key;
+}
+function onSaveDestChange(){
+  const dest = document.getElementById('save-dest').value;
+  document.getElementById('save-ask-location-wrap').style.display = (dest === 'device') ? 'flex' : 'none';
+  updateCloudAuthStatus();
+}
+function updateCloudAuthStatus(){
+  const dest = document.getElementById('save-dest').value;
+  const el = document.getElementById('cloud-auth-status');
+  if (dest === 'device'){ el.textContent = ''; return; }
+  const cfg = CLOUD_CONFIG[dest];
+  if (!cfg || !cfg.clientId){
+    el.textContent = `No ${cloudLabel(dest)} Client ID is configured in this copy of the tool yet.`;
+    el.style.color = 'var(--warn)';
+    return;
+  }
+  const tok = cloudTokens[dest];
+  if (tok && tok.expiresAt > Date.now()){
+    el.textContent = `Signed in to ${cloudLabel(dest)} - files will upload there until you close this tab.`;
+    el.style.color = 'var(--accent2)';
+  } else {
+    el.textContent = `Not signed in yet - you'll be prompted the first time you save.`;
+    el.style.color = 'var(--muted)';
+  }
+}
+
+function b64url(bytes){
+  let str = '';
+  bytes.forEach(b => str += String.fromCharCode(b));
+  return btoa(str).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function randomVerifier(){
+  const arr = new Uint8Array(64);
+  crypto.getRandomValues(arr);
+  return b64url(arr);
+}
+async function pkceChallenge(verifier){
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  return b64url(new Uint8Array(digest));
+}
+function openAuthPopup(url){
+  const w = 520, h = 680;
+  const left = Math.max(0, (window.screen.width - w) / 2), top = Math.max(0, (window.screen.height - h) / 2);
+  return window.open(url, 'oauthPopup', `width=${w},height=${h},left=${left},top=${top}`);
+}
+function waitForPopupRedirect(popup, redirectUri){
+  return new Promise((resolve, reject) => {
+    if (!popup){ reject(new Error('The sign-in pop-up was blocked by the browser - allow pop-ups for this page and try again.')); return; }
+    const timer = setInterval(() => {
+      if (popup.closed){
+        clearInterval(timer);
+        reject(new Error('Sign-in window was closed before completing.'));
+        return;
+      }
+      let href;
+      try{ href = popup.location.href; }
+      catch(e){ return; } // still on the provider's cross-origin domain - keep waiting
+      if (href && href.indexOf(redirectUri) === 0){
+        clearInterval(timer);
+        popup.close();
+        resolve(href);
+      }
+    }, 300);
+  });
+}
+
+async function ensureCloudSignedIn(provider){
+  if (cloudTokens[provider] && cloudTokens[provider].expiresAt > Date.now()) return cloudTokens[provider].token;
+  const cfg = CLOUD_CONFIG[provider];
+  if (!cfg || !cfg.clientId) throw new Error(`No ${cloudLabel(provider)} Client ID is configured in this copy of the tool.`);
+  const redirectUri = location.origin + location.pathname;
+
+  if (provider === 'google'){
+    const state = randomVerifier();
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(cfg.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(cfg.scope)}&include_granted_scopes=true&prompt=consent&state=${state}`;
+    const returned = await waitForPopupRedirect(openAuthPopup(url), redirectUri);
+    const hash = new URLSearchParams((returned.split('#')[1]) || '');
+    const token = hash.get('access_token');
+    if (!token) throw new Error('Google sign-in did not return an access token.');
+    const expiresIn = Number(hash.get('expires_in') || 3600);
+    cloudTokens.google = { token, expiresAt: Date.now() + (expiresIn - 60) * 1000 };
+    updateCloudAuthStatus();
+    return token;
+  }
+
+  if (provider === 'onedrive'){
+    const verifier = randomVerifier();
+    const challenge = await pkceChallenge(verifier);
+    const state = randomVerifier();
+    const url = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${encodeURIComponent(cfg.clientId)}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(cfg.scope)}&code_challenge=${challenge}&code_challenge_method=S256&state=${state}`;
+    const returned = await waitForPopupRedirect(openAuthPopup(url), redirectUri);
+    const query = new URLSearchParams((returned.split('?')[1] || '').split('#')[0]);
+    const code = query.get('code');
+    if (!code) throw new Error('Microsoft sign-in did not return an authorization code.');
+    const tokenRes = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body: new URLSearchParams({ client_id:cfg.clientId, grant_type:'authorization_code', code, redirect_uri:redirectUri, code_verifier:verifier, scope:cfg.scope })
+    });
+    const tokenJson = await tokenRes.json();
+    if (!tokenJson.access_token) throw new Error(tokenJson.error_description || 'Microsoft token exchange failed.');
+    cloudTokens.onedrive = { token: tokenJson.access_token, expiresAt: Date.now() + ((tokenJson.expires_in || 3600) - 60) * 1000 };
+    updateCloudAuthStatus();
+    return tokenJson.access_token;
+  }
+
+  if (provider === 'dropbox'){
+    const verifier = randomVerifier();
+    const challenge = await pkceChallenge(verifier);
+    const state = randomVerifier();
+    const url = `https://www.dropbox.com/oauth2/authorize?client_id=${encodeURIComponent(cfg.clientId)}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&code_challenge=${challenge}&code_challenge_method=S256&token_access_type=online&state=${state}`;
+    const returned = await waitForPopupRedirect(openAuthPopup(url), redirectUri);
+    const query = new URLSearchParams((returned.split('?')[1] || '').split('#')[0]);
+    const code = query.get('code');
+    if (!code) throw new Error('Dropbox sign-in did not return an authorization code.');
+    const tokenRes = await fetch('https://api.dropboxapi.com/oauth2/token', {
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body: new URLSearchParams({ client_id:cfg.clientId, grant_type:'authorization_code', code, redirect_uri:redirectUri, code_verifier:verifier })
+    });
+    const tokenJson = await tokenRes.json();
+    if (!tokenJson.access_token) throw new Error(tokenJson.error_summary || 'Dropbox token exchange failed.');
+    cloudTokens.dropbox = { token: tokenJson.access_token, expiresAt: Date.now() + ((tokenJson.expires_in || 14400) - 60) * 1000 };
+    updateCloudAuthStatus();
+    return tokenJson.access_token;
+  }
+  return null;
+}
+
+async function uploadToGoogleDrive(filename, blob, token){
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify({ name: filename })], { type:'application/json' }));
+  form.append('file', blob);
+  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method:'POST', headers:{ Authorization:'Bearer ' + token }, body: form
+  });
+  if (!res.ok) throw new Error(`Google Drive upload failed (HTTP ${res.status}).`);
+}
+async function uploadToOneDrive(filename, blob, mimeType, token){
+  const res = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${encodeURIComponent(filename)}:/content`, {
+    method:'PUT', headers:{ Authorization:'Bearer ' + token, 'Content-Type': mimeType || 'application/octet-stream' }, body: blob
+  });
+  if (!res.ok) throw new Error(`OneDrive upload failed (HTTP ${res.status}).`);
+}
+async function uploadToDropbox(filename, blob, token){
+  const args = JSON.stringify({ path:'/' + filename, mode:'add', autorename:true, mute:false });
+  const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
+    method:'POST',
+    headers:{ Authorization:'Bearer ' + token, 'Dropbox-API-Arg': args, 'Content-Type':'application/octet-stream' },
+    body: blob
+  });
+  if (!res.ok) throw new Error(`Dropbox upload failed (HTTP ${res.status}).`);
+}
+
+// Shared save dispatcher - every download button routes through here.
+async function saveOutputFile(filename, data, mimeType, successMsg){
+  const blob = (data instanceof Blob) ? data : new Blob([data], { type: mimeType });
+  const dest = document.getElementById('save-dest').value;
+
+  if (dest === 'device'){
+    if (document.getElementById('save-ask-location').checked && window.showSaveFilePicker){
+      try{
+        const handle = await window.showSaveFilePicker({ suggestedName: filename });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        showMsg(successMsg || (filename + ' saved.'), true);
+        return true;
+      }catch(e){
+        if (e && e.name === 'AbortError'){ showMsg('Save cancelled.', false); return false; }
+        // any other error (e.g. picker unsupported mid-flow) - fall through to a normal download
+      }
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    showMsg(successMsg || (filename + ' downloaded.'), true);
+    return true;
+  }
+
+  try{
+    showMsg(`Uploading ${filename} to ${cloudLabel(dest)}...`, true);
+    const token = await ensureCloudSignedIn(dest);
+    if (dest === 'google') await uploadToGoogleDrive(filename, blob, token);
+    else if (dest === 'onedrive') await uploadToOneDrive(filename, blob, mimeType, token);
+    else if (dest === 'dropbox') await uploadToDropbox(filename, blob, token);
+    showMsg(`${successMsg ? successMsg + ' ' : ''}${filename} saved to ${cloudLabel(dest)}.`, true);
+    return true;
+  }catch(e){
+    showMsg(`Could not save to ${cloudLabel(dest)}: ${e.message || e}`, false);
+    return false;
+  }
+}
+
 // ---------- Station info bindings ----------
-['st-name','st-routine','st-program','st-cyclemode','st-reset','st-faulttag','st-faultstep','st-faultreset'].forEach(id=>{
+// Program Name is not a separate field -- it always matches Station / Machine Name.
+['st-name','st-routine','st-cyclemode','st-reset','st-faulttag','st-faultstep','st-faultreset'].forEach(id=>{
   document.getElementById(id).addEventListener('change', syncStation);
   document.getElementById(id).addEventListener('input', syncStation);
 });
 function syncStation(){
   state.station.name = document.getElementById('st-name').value.trim();
   state.station.routine = document.getElementById('st-routine').value.trim();
-  state.station.program = document.getElementById('st-program').value.trim() || 'MainProgram';
+  state.station.program = state.station.name || 'MainProgram';
   state.station.cycleMode = document.getElementById('st-cyclemode').value;
   state.station.resetInput = document.getElementById('st-reset').value;
   state.station.faultTag = document.getElementById('st-faulttag').value.trim();
@@ -609,8 +995,18 @@ function removeStep(id){
 function closeAllMs(except){
   document.querySelectorAll('.multiselect.open').forEach(el=>{ if(el!==except) el.classList.remove('open'); });
 }
+function toggleInfoTip(btn){
+  const wrap = btn.closest('.info-tip');
+  const isOpen = wrap.classList.contains('open');
+  closeAllInfoTips();
+  if (!isOpen) wrap.classList.add('open');
+}
+function closeAllInfoTips(except){
+  document.querySelectorAll('.info-tip.open').forEach(el=>{ if(el!==except) el.classList.remove('open'); });
+}
 document.addEventListener('click', (e)=>{
   if (!e.target.closest('.multiselect')) closeAllMs();
+  if (!e.target.closest('.info-tip')) closeAllInfoTips();
 });
 
 function multiSelectHtml(id, options, selected, onToggle){
@@ -762,12 +1158,23 @@ function loadExample(){
     if (!confirm('This will replace your current configuration. Continue?')) return;
   }
   uid = 1;
-  state = { station:{}, equipment:[], inputs:[], outputs:[], steps:[] };
+  state = { station:{}, project:{}, equipment:[], inputs:[], outputs:[], steps:[] };
 
   document.getElementById('st-name').value = 'Station10_PartClamp';
   document.getElementById('st-routine').value = 'R_Station10_Sequence';
-  document.getElementById('st-program').value = 'MainProgram';
   document.getElementById('st-cyclemode').value = 'continuous';
+
+  document.getElementById('pp-safetyplc-no').checked = true;
+  document.getElementById('pp-safetyplc-yes').checked = false;
+  document.getElementById('pp-platform').value = 'compactlogix';
+  document.getElementById('pp-version').value = 'v38';
+  document.getElementById('pp-projecttype').value = 'new';
+  document.getElementById('pp-tagconvention').value = 'isa';
+  document.getElementById('pp-remoteio').value = 'local';
+  document.getElementById('pp-hmi').value = 'none';
+  document.getElementById('pp-cycletime').value = '~35 sec/cycle';
+  document.getElementById('pp-estoparch').value = 'hardwired';
+  syncProject();
 
   addEquipment({id:newId(), name:'CYL-101', type:'Pneumatic Cylinder', manufacturer:'', model:'', notes:'Clamps part against fixture', usesEds:false, moduleTagName:'', edsMembers:[]});
   addEquipment({id:newId(), name:'PE-101', type:'Photo-eye / Sensor', manufacturer:'', model:'', notes:'Part present sensing', usesEds:false, moduleTagName:'', edsMembers:[]});
@@ -811,13 +1218,10 @@ function loadExample(){
 }
 
 // ---------- Config export/import ----------
-function exportConfig(){
+async function exportConfig(){
   syncStation();
-  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = (state.station.name || 'station_config') + '.json';
-  a.click();
+  const filename = (state.station.name || 'station_config') + '.json';
+  await saveOutputFile(filename, JSON.stringify(state, null, 2), 'application/json', 'Config exported.');
 }
 function loadConfigData(data){
   uid = 1;
@@ -847,10 +1251,28 @@ function loadConfigData(data){
   if (state.station.faultResetInput===undefined) state.station.faultResetInput='';
   document.getElementById('st-name').value = state.station.name||'';
   document.getElementById('st-routine').value = state.station.routine||'';
-  document.getElementById('st-program').value = state.station.program||'MainProgram';
+  state.station.program = state.station.name || 'MainProgram';
   document.getElementById('st-cyclemode').value = state.station.cycleMode||'continuous';
   document.getElementById('st-faulttag').value = state.station.faultTag||'';
   document.getElementById('st-faultstep').value = state.station.faultStep ?? '';
+
+  // Pre-project info (older configs won't have this - backfill defaults)
+  if (!state.project) state.project = {};
+  const pj = state.project;
+  document.getElementById('pp-safetyplc-yes').checked = !!pj.safetyPlc;
+  document.getElementById('pp-safetyplc-no').checked = !pj.safetyPlc;
+  document.getElementById('pp-platform').value = pj.platform || '';
+  const verSel = document.getElementById('pp-version');
+  verSel.value = pj.studioVersion || 'v38';
+  if (verSel.value !== (pj.studioVersion || 'v38')) verSel.value = 'v38'; // removed option (e.g. old v36 configs) - fall back to current default
+  document.getElementById('pp-projecttype').value = pj.projectType || 'new';
+  document.getElementById('pp-tagconvention').value = pj.tagConvention || '';
+  document.getElementById('pp-remoteio').value = pj.remoteIo || '';
+  document.getElementById('pp-hmi').value = pj.hmi || '';
+  document.getElementById('pp-cycletime').value = pj.cycleTime || '';
+  document.getElementById('pp-estoparch').value = pj.estopArch || '';
+  syncProject();
+
   renderEquipment(); renderInputs(); renderOutputs();
   document.getElementById('st-reset').value = state.station.resetInput||'';
   document.getElementById('st-faultreset').value = state.station.faultResetInput||'';
@@ -872,6 +1294,76 @@ function importConfig(evt){
   };
   reader.readAsText(file);
   evt.target.value = '';
+}
+
+// ---------- Existing-project L5X comparison (in-memory only, never saved to config/autosave) ----------
+let existingProject = null; // { fileName, tags:[{name,dtype,scope}], programs:[name...], routines:[{name,program}] }
+
+function parseExistingL5X(xmlText, fileName){
+  let doc;
+  try{
+    doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+  }catch(e){
+    return { valid:false, error:'Could not parse this file as XML.' };
+  }
+  if (doc.getElementsByTagName('parsererror').length){
+    return { valid:false, error:'This file is not well-formed XML - is it really an L5X export?' };
+  }
+  const root = doc.documentElement;
+  if (!root || root.nodeName !== 'RSLogix5000Content'){
+    return { valid:false, error:'Root element is not <RSLogix5000Content> - this doesn\'t look like a Studio 5000 L5X export.' };
+  }
+
+  const tags = [...doc.getElementsByTagName('Tag')].map(el=>({
+    name: el.getAttribute('Name') || '',
+    dtype: el.getAttribute('DataType') || '',
+    scope: el.closest('Program') ? 'program' : 'controller'
+  })).filter(t=>t.name);
+
+  const programs = [...doc.getElementsByTagName('Program')].map(el=>el.getAttribute('Name') || '').filter(Boolean);
+
+  const routines = [...doc.getElementsByTagName('Routine')].map(el=>({
+    name: el.getAttribute('Name') || '',
+    program: (el.closest('Program') && el.closest('Program').getAttribute('Name')) || null
+  })).filter(r=>r.name);
+
+  return { valid:true, fileName, tags, programs, routines };
+}
+
+function handleExistingL5XUpload(evt){
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const result = parseExistingL5X(String(reader.result), file.name);
+    if (!result.valid){
+      existingProject = null;
+      renderExistingProjectStatus('Error: ' + result.error, false);
+    } else {
+      existingProject = result;
+      const ctrlTagCount = result.tags.filter(t=>t.scope==='controller').length;
+      renderExistingProjectStatus(
+        `Loaded "${result.fileName}" - ${result.tags.length} tag(s) (${ctrlTagCount} controller-scope), ${result.programs.length} program(s), ${result.routines.length} routine(s). Run Validate Station to see comparison results.`,
+        true
+      );
+    }
+  };
+  reader.onerror = () => renderExistingProjectStatus('Could not read that file.', false);
+  reader.readAsText(file);
+  evt.target.value = '';
+}
+
+function clearExistingProject(){
+  existingProject = null;
+  renderExistingProjectStatus('', null);
+}
+
+function renderExistingProjectStatus(text, ok){
+  const el = document.getElementById('existing-l5x-status');
+  const clearBtn = document.getElementById('existing-l5x-clear');
+  el.textContent = text;
+  el.style.color = ok === false ? 'var(--danger)' : (ok === true ? 'var(--accent2)' : '');
+  clearBtn.style.display = existingProject ? 'inline-block' : 'none';
 }
 
 // ---------- L5X generation ----------
@@ -941,9 +1433,22 @@ function condGroupsText(condGroups){
 function stationFaultTag(){
   return state.station.faultTag || ((state.station.name ? state.station.name.replace(/[^A-Za-z0-9_]/g,'_') : 'Station') + '_Fault');
 }
+function collectGeneratedTags(){
+  const stepTagName = (state.station.name ? state.station.name.replace(/[^A-Za-z0-9_]/g,'_') : 'Station') + '_Step';
+  const tags = [{name: stepTagName, dtype:'DINT'}];
+  state.inputs.forEach(i=>{ if (i.tag) tags.push({name: i.tag, dtype: i.dtype || 'BOOL'}); });
+  state.outputs.forEach(o=>{ if (o.tag) tags.push({name: o.tag, dtype: o.dtype || 'BOOL'}); });
+  state.steps.forEach(st=>{
+    if (st.mode === 'timer') tags.push({name: 'Step'+st.num+'_TMR', dtype:'TIMER'});
+    if (st.watchdogSec) tags.push({name: 'Step'+st.num+'_WD', dtype:'TIMER'});
+  });
+  if (state.steps.some(s=>s.watchdogSec)) tags.push({name: stationFaultTag(), dtype:'BOOL'});
+  return tags;
+}
 
 function generateL5X(){
   syncStation();
+  syncProject();
   const errors = [];
   if (!state.station.routine) errors.push('Routine Name is required.');
   if (!validTag(state.station.routine)) errors.push('Routine Name must be a valid tag-style identifier (letters, numbers, underscore, start with a letter).');
@@ -1022,6 +1527,17 @@ function generateL5X(){
   // ---- Rungs ----
   const rungs = [];
   rungs.push(rung(';', `Auto-generated by Station Sequence Builder for "${state.station.name||'(unnamed station)'}" - ${new Date().toDateString()}`));
+  {
+    const pj = state.project || {};
+    const ctxBits = [
+      pj.platform ? 'Controller=' + ppLabel('platform', pj.platform) : null,
+      pj.studioVersion ? 'Studio 5000=' + ppLabel('studioVersion', pj.studioVersion) : null,
+      'Safety PLC=' + (pj.safetyPlc ? 'Yes' : 'No'),
+      pj.estopArch ? 'E-stop/Interlock=' + ppLabel('estopArch', pj.estopArch) : null,
+      pj.projectType ? 'Target Project=' + ppLabel('projectType', pj.projectType) : null
+    ].filter(Boolean);
+    if (ctxBits.length) rungs.push(rung(';', 'Project context: ' + ctxBits.join(', ')));
+  }
 
   edsEquip.forEach(eq=>{
     const idBits = [eq.manufacturer, eq.model].filter(Boolean).join(' ');
@@ -1073,9 +1589,10 @@ function generateL5X(){
 
   const numberedRungs = rungs.map((r,i)=> r.replace('__N__', i)).join('\n');
   const exportDate = new Date().toString();
+  const softwareRevision = STUDIO_VERSION_MAP[(state.project||{}).studioVersion] || '38.00';
 
   const xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<RSLogix5000Content SchemaRevision="1.0" SoftwareRevision="33.00" TargetName="${esc(state.station.routine)}" TargetType="Routine" TargetSubType="Ladder" ContainsContext="true" ExportDate="${exportDate}" ExportOptions="References NoRawData L5KData DecoratedData Context Dependencies ForceProtectedEncoding AllProjDocTrans">
+<RSLogix5000Content SchemaRevision="1.0" SoftwareRevision="${softwareRevision}" TargetName="${esc(state.station.routine)}" TargetType="Routine" TargetSubType="Ladder" ContainsContext="true" ExportDate="${exportDate}" ExportOptions="References NoRawData L5KData DecoratedData Context Dependencies ForceProtectedEncoding AllProjDocTrans">
 <Controller Use="Context" Name="TargetController">
 <DataTypes Use="Context">
 </DataTypes>
@@ -1115,15 +1632,12 @@ function togglePreview(){
   clearMsg();
 }
 
-function doGenerate(){
+async function doGenerate(){
   const result = generateL5X();
   if (!result) return;
-  const blob = new Blob([result.xml], {type:'application/xml'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = (state.station.routine || 'Routine') + '.L5X';
-  a.click();
-  showMsg(`Generated ${result.rungCount} rungs and ${result.tagCount} tags. File downloaded - import it into Studio 5000 via Program → Import Routine.`, true);
+  const filename = (state.station.routine || 'Routine') + '.L5X';
+  await saveOutputFile(filename, result.xml, 'application/xml',
+    `Generated ${result.rungCount} rungs and ${result.tagCount} tags - import it into Studio 5000 via Program → Import Routine.`);
 }
 
 // ---------- SOP generation ----------
@@ -1135,6 +1649,7 @@ function sopEsc(s){ return esc(s); }
 
 function generateSOP(){
   syncStation();
+  syncProject();
   if (!state.station.name){ showMsg('Add a Station / Machine Name before generating an SOP.', false); return null; }
   if (!state.steps.length){ showMsg('Add at least one step before generating an SOP.', false); return null; }
 
@@ -1254,35 +1769,44 @@ function generateSOP(){
     <tr><td class="k">Approved By</td><td>&nbsp;</td><td class="k">Approval Date</td><td>&nbsp;</td></tr>
   </table>
 
-  <h2>1. Purpose &amp; Scope</h2>
+  <h2>1. Project Information</h2>
+  <table class="doc-control">
+    <tr><td class="k">Safety PLC in Use</td><td>${state.project.safetyPlc ? 'Yes' : 'No'}</td><td class="k">Controller Platform</td><td>${sopEsc(ppLabel('platform', state.project.platform)) || '&mdash;'}</td></tr>
+    <tr><td class="k">Studio 5000 Version</td><td>${sopEsc(ppLabel('studioVersion', state.project.studioVersion)) || '&mdash;'}</td><td class="k">Project Type</td><td>${sopEsc(ppLabel('projectType', state.project.projectType)) || '&mdash;'}</td></tr>
+    <tr><td class="k">Tag Naming Convention</td><td>${sopEsc(ppLabel('tagConvention', state.project.tagConvention)) || '&mdash;'}</td><td class="k">Remote I/O Architecture</td><td>${sopEsc(ppLabel('remoteIo', state.project.remoteIo)) || '&mdash;'}</td></tr>
+    <tr><td class="k">HMI / SCADA Platform</td><td>${sopEsc(ppLabel('hmi', state.project.hmi)) || '&mdash;'}</td><td class="k">Target Cycle Time</td><td>${sopEsc(state.project.cycleTime) || '&mdash;'}</td></tr>
+    <tr><td class="k">E-Stop / Interlock Architecture</td><td colspan="3">${sopEsc(ppLabel('estopArch', state.project.estopArch)) || '&mdash;'}</td></tr>
+  </table>
+
+  <h2>2. Purpose &amp; Scope</h2>
   <p>This procedure describes the standard operating sequence for <strong>${sopEsc(state.station.name)}</strong>. It is intended for trained operators and technicians responsible for running this station and covers the automatic operating cycle from start through completion.</p>
 
-  <h2>2. Safety Precautions</h2>
+  <h2>3. Safety Precautions</h2>
   <ul>${safetyHtml}</ul>
   <p class="sop-muted">This section is generated from the interlock defined in the builder plus standard boilerplate &mdash; add any site- or process-specific hazards (pinch points, hot surfaces, pressurized lines, chemical exposure, etc.) before publishing this document.</p>
 
-  <h2>3. Equipment</h2>
+  <h2>4. Equipment</h2>
   <table>
     <thead><tr><th>Name</th><th>Type</th><th>Manufacturer</th><th>Model</th><th>Notes</th></tr></thead>
     <tbody>${equipRows}</tbody>
   </table>
 
-  <h2>4. Inputs Reference</h2>
+  <h2>5. Inputs Reference</h2>
   <table>
     <thead><tr><th>Tag</th><th>Description</th><th>Equipment</th></tr></thead>
     <tbody>${ioRowsHtml(state.inputs)}</tbody>
   </table>
 
-  <h2>5. Outputs Reference</h2>
+  <h2>6. Outputs Reference</h2>
   <table>
     <thead><tr><th>Tag</th><th>Description</th><th>Equipment</th></tr></thead>
     <tbody>${ioRowsHtml(state.outputs)}</tbody>
   </table>
 
-  <h2>6. Operating Sequence</h2>
+  <h2>7. Operating Sequence</h2>
   ${stepsHtml}
 
-  <h2>7. Revision History</h2>
+  <h2>8. Revision History</h2>
   <table>
     <thead><tr><th style="width:12%">Rev</th><th style="width:18%">Date</th><th>Description of Change</th><th style="width:18%">By</th></tr></thead>
     <tbody><tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr></tbody>
@@ -1438,6 +1962,7 @@ const BODY = { size:20 };
 
 function buildSopDocxBody(){
   syncStation();
+  syncProject();
   if (!state.station.name){ showMsg('Add a Station / Machine Name before generating an SOP.', false); return null; }
   if (!state.steps.length){ showMsg('Add at least one step before generating an SOP.', false); return null; }
 
@@ -1456,10 +1981,19 @@ function buildSopDocxBody(){
     docxTrow([kcell('Approved By'), docxTcell(''), kcell('Approval Date'), docxTcell('')])
   ], 4);
 
-  body += docxPara('1. Purpose & Scope', H2);
+  body += docxPara('1. Project Information', H2);
+  body += docxTable([
+    docxTrow([kcell('Safety PLC in Use'), docxTcell(state.project.safetyPlc ? 'Yes' : 'No'), kcell('Controller Platform'), docxTcell(ppLabel('platform', state.project.platform) || '—')]),
+    docxTrow([kcell('Studio 5000 Version'), docxTcell(ppLabel('studioVersion', state.project.studioVersion) || '—'), kcell('Project Type'), docxTcell(ppLabel('projectType', state.project.projectType) || '—')]),
+    docxTrow([kcell('Tag Naming Convention'), docxTcell(ppLabel('tagConvention', state.project.tagConvention) || '—'), kcell('Remote I/O Architecture'), docxTcell(ppLabel('remoteIo', state.project.remoteIo) || '—')]),
+    docxTrow([kcell('HMI / SCADA Platform'), docxTcell(ppLabel('hmi', state.project.hmi) || '—'), kcell('Target Cycle Time'), docxTcell(state.project.cycleTime || '—')]),
+    docxTrow([kcell('E-Stop / Interlock Architecture'), docxTcell(ppLabel('estopArch', state.project.estopArch) || '—', {span:3})])
+  ], 4);
+
+  body += docxPara('2. Purpose & Scope', H2);
   body += docxPara(`This procedure describes the standard operating sequence for ${state.station.name}. It is intended for trained operators and technicians responsible for running this station and covers the automatic operating cycle from start through completion.`, BODY);
 
-  body += docxPara('2. Safety Precautions', H2);
+  body += docxPara('3. Safety Precautions', H2);
   let safetyItems = [];
   if (state.station.resetInput){
     const rDesc = lookupIODesc(state.station.resetInput);
@@ -1474,7 +2008,7 @@ function buildSopDocxBody(){
   safetyItems.forEach(s => body += docxPara('•  ' + s, BODY));
   body += docxPara('This section is generated from the interlock defined in the builder plus standard boilerplate - add any site- or process-specific hazards (pinch points, hot surfaces, pressurized lines, chemical exposure, etc.) before publishing this document.', MUTED);
 
-  body += docxPara('3. Equipment', H2);
+  body += docxPara('4. Equipment', H2);
   const eqHeader = docxTrow(['Name','Type','Manufacturer','Model','Notes'].map(hcell));
   const eqRows = state.equipment.length
     ? state.equipment.map(eq => docxTrow([eq.name,eq.type,eq.manufacturer,eq.model,eq.notes].map(v=>docxTcell(v||''))))
@@ -1489,10 +2023,10 @@ function buildSopDocxBody(){
       : [docxTrow([docxTcell('None recorded.', {span:3, paraOpts:MUTED})])];
     body += docxTable([header, ...rows], 3);
   };
-  ioTable('4. Inputs Reference', state.inputs);
-  ioTable('5. Outputs Reference', state.outputs);
+  ioTable('5. Inputs Reference', state.inputs);
+  ioTable('6. Outputs Reference', state.outputs);
 
-  body += docxPara('6. Operating Sequence', H2);
+  body += docxPara('7. Operating Sequence', H2);
   sorted.forEach((st, idx) => {
     const defaultNext = idx < sorted.length-1 ? sorted[idx+1].num : (state.station.cycleMode==='continuous' ? 0 : st.num);
     const nextStep = (st.next===null || st.next===undefined || st.next==='') ? defaultNext : st.next;
@@ -1539,7 +2073,7 @@ function buildSopDocxBody(){
     body += docxPara('', { spacingAfter:60 });
   });
 
-  body += docxPara('7. Revision History', H2);
+  body += docxPara('8. Revision History', H2);
   body += docxTable([
     docxTrow(['Rev','Date','Description of Change','By'].map(hcell)),
     docxTrow(['','','',''].map(v=>docxTcell(v)))
@@ -1599,15 +2133,13 @@ function buildSopDocx(){
   return { bytes: buildZip(files), stepCount: state.steps.length };
 }
 
-function downloadSOP(){
+async function downloadSOP(){
   const result = buildSopDocx();
   if (!result) return;
+  const filename = 'SOP_' + (state.station.name || 'Station').replace(/[^A-Za-z0-9_]/g,'_') + '.docx';
   const blob = new Blob([result.bytes], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'SOP_' + (state.station.name || 'Station').replace(/[^A-Za-z0-9_]/g,'_') + '.docx';
-  a.click();
-  showMsg(`SOP (.docx) generated with ${result.stepCount} step(s). Open it in Word to review, format, and add site-specific safety details before publishing.`, true);
+  await saveOutputFile(filename, blob, blob.type,
+    `SOP (.docx) generated with ${result.stepCount} step(s) - open it in Word to review, format, and add site-specific safety details before publishing.`);
 }
 
 // ---------- Flowchart (SVG, no external dependencies) ----------
@@ -1751,15 +2283,12 @@ function toggleFlowchart(){
   clearMsg();
 }
 
-function downloadFlowchart(){
+async function downloadFlowchart(){
   const result = generateFlowchartSVG();
   if (!result) return;
-  const blob = new Blob([result.svg], {type:'image/svg+xml'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'Flowchart_' + (state.station.name || 'Station').replace(/[^A-Za-z0-9_]/g,'_') + '.svg';
-  a.click();
-  showMsg(`Flowchart generated with ${result.stepCount} step(s) and ${result.edgeCount} transition(s). SVG opens in any browser and can be dropped into the SOP or printed directly.`, true);
+  const filename = 'Flowchart_' + (state.station.name || 'Station').replace(/[^A-Za-z0-9_]/g,'_') + '.svg';
+  await saveOutputFile(filename, result.svg, 'image/svg+xml',
+    `Flowchart generated with ${result.stepCount} step(s) and ${result.edgeCount} transition(s) - SVG opens in any browser and can be dropped into the SOP or printed directly.`);
 }
 
 // ---------- Tag list CSV export ----------
@@ -1800,24 +2329,21 @@ function generateTagListCSV(){
 
   return rows.map(r=>r.map(csvField).join(',')).join('\r\n');
 }
-function downloadTagListCSV(){
+async function downloadTagListCSV(){
   syncStation();
   if (!state.inputs.length && !state.outputs.length && !state.steps.length){
     showMsg('Add some inputs, outputs, or steps before exporting a tag list.', false);
     return;
   }
   const csv = generateTagListCSV();
-  const blob = new Blob([csv], {type:'text/csv'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'TagList_' + (state.station.name || 'Station').replace(/[^A-Za-z0-9_]/g,'_') + '.csv';
-  a.click();
-  showMsg('Tag list CSV downloaded.', true);
+  const filename = 'TagList_' + (state.station.name || 'Station').replace(/[^A-Za-z0-9_]/g,'_') + '.csv';
+  await saveOutputFile(filename, csv, 'text/csv', 'Tag list CSV saved.');
 }
 
 // ---------- Validation ----------
 function validateStation(){
   syncStation();
+  syncProject();
   const errors = [];
   const warnings = [];
   const infos = [];
@@ -1890,6 +2416,54 @@ function validateStation(){
   });
   if (edsIssues.length) warnings.push(...edsIssues);
 
+  // Pre-project info checks
+  const pj = state.project || {};
+  if (pj.safetyPlc && !state.station.resetInput){
+    warnings.push('Safety PLC is in use but no Safety/Reset Input is configured for this routine - confirm whether this routine needs to monitor a safety status tag from the safety task/controller.');
+  }
+  if (pj.projectType === 'existing' && !existingProject){
+    infos.push('This routine is targeted at an existing/live controller project - upload that project\'s L5X above (Pre-Project Info) so Validate Station can check for tag name collisions automatically, or check manually in Studio 5000 before importing.');
+  }
+  if (pj.studioVersion === 'v36'){
+    warnings.push('Studio 5000 v36 (v36.00.02-37.00.02) is affected by CVE-2025-7971, an unsafe environment-variable handling issue Rockwell rates as allowing possible code execution. Update to 37.00.02 or later.');
+  }
+  if (pj.studioVersion === 'v37'){
+    infos.push('Confirm you are on Studio 5000 37.00.02 or later - earlier v37 patches are affected by CVE-2025-7971 per Rockwell\'s advisory.');
+  }
+
+  // Existing-project comparison (only runs if an L5X was uploaded above)
+  if (existingProject && existingProject.valid){
+    const existingTagMap = new Map();
+    existingProject.tags.forEach(t=>{ if (!existingTagMap.has(t.name)) existingTagMap.set(t.name, t); });
+
+    collectGeneratedTags().forEach(gt=>{
+      const ex = existingTagMap.get(gt.name);
+      if (!ex) return;
+      if (ex.dtype && gt.dtype && ex.dtype !== gt.dtype){
+        errors.push(`Existing-project comparison: tag "${gt.name}" already exists in the uploaded project as type ${ex.dtype}, but this routine declares it as ${gt.dtype}. Resolve the mismatch before importing.`);
+      } else {
+        infos.push(`Existing-project comparison: tag "${gt.name}" already exists in the uploaded project (same type) - Studio 5000 will reuse it.`);
+      }
+    });
+
+    if (state.station.program){
+      if (existingProject.programs.includes(state.station.program)){
+        infos.push(`Existing-project comparison: Program "${state.station.program}" already exists in the uploaded project - this routine will be added to it.`);
+      } else {
+        infos.push(`Existing-project comparison: Program "${state.station.program}" was not found in the uploaded project - you'll need to create it in Studio 5000 during/before import.`);
+      }
+    }
+    if (state.station.routine){
+      const matches = existingProject.routines.filter(r=>r.name===state.station.routine);
+      const sameProgram = matches.find(r=>r.program===state.station.program);
+      if (sameProgram){
+        warnings.push(`Existing-project comparison: Routine "${state.station.routine}" already exists inside Program "${state.station.program}" in the uploaded project - importing will overwrite it.`);
+      } else if (matches.length){
+        infos.push(`Existing-project comparison: a routine named "${state.station.routine}" already exists in a different program (${matches.map(m=>m.program||'(unknown)').join(', ')}) in the uploaded project - shouldn't conflict, but double-check the name.`);
+      }
+    }
+  }
+
   return { errors, warnings, infos };
 }
 
@@ -1920,7 +2494,14 @@ renderInputs();
 renderOutputs();
 renderSteps();
 refreshResetOptions();
-tryRestoreAutosave();
+syncProject();
+onSaveDestChange();
+// Skip the autosave-restore prompt if this window is actually a cloud-sign-in pop-up
+// (it was opened via window.open() and is about to be closed automatically once the
+// redirect back to this page is detected - see waitForPopupRedirect above).
+if (!(window.opener && window.opener !== window)){
+  tryRestoreAutosave();
+}
 </script>
 </body>
 </html>
